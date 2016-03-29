@@ -50,7 +50,7 @@ int xclose(int d)
   int r;
   if ((uint)d >= NOFILE) return -1;
   switch (xft[d]) {
-  case xSOCKET: 
+  case xSOCKET:
   case xFILE: r = close(xfd[d]); break;
   case xDIR: closedir((DIR*)xfd[d]); r = 0; break;
   }
@@ -61,7 +61,7 @@ int xread(int d, void *b, int n)
 {
   struct dirent *de;
   int c;
-  
+
   if ((uint)d >= NOFILE) return -1;
   switch (xft[d]) {
   case xSOCKET: return read(xfd[d], b, n);
@@ -108,7 +108,7 @@ int xdprintf(int d, char *f, ...)
   static char buf[4096]; va_list v; int n;
   va_start(v, f);
   n = vsprintf(buf, f, v);
-  va_end(v);  
+  va_end(v);
   return xwrite(d, buf, n);
 }
 int xvdprintf(int d, char *f, va_list v)
@@ -158,10 +158,10 @@ int xstat(char *file, struct xstat *s)
 }
 void *xsbrk(int i)
 {
-  void *p; static brk = 0;
+  void *p; static int brk = 0;
   if (!i) return (void *)brk;
   if (i < 0) { printf("sbrk(i<0) not implemented\n"); exit(-1); }
-  if (p = malloc(i)) { memset(p, 0, i); brk += i; return p; } // XXX memset is probably redundant since we never reallocate
+  if ((p = malloc(i))) { memset(p, 0, i); brk += i; return p; } // XXX memset is probably redundant since we never reallocate
   return (void *)-1;
 }
 int xmkdir(char *path)
@@ -198,9 +198,9 @@ int main(int argc, char *argv[])
   int i;
   tcgetattr(0,&sttybuf);
   sttybuf.c_lflag &= ~(ECHO | ICANON);
-  tcsetattr(0,TCSANOW,&sttybuf);  
-  for (i=0; i<3;      i++) { xfd[i] =  i; xft[i] = xCONSOLE; } 
-  for (i=3; i<NOFILE; i++) { xfd[i] = -1; xft[i] = xCLOSED;  } 
+  tcsetattr(0,TCSANOW,&sttybuf);
+  for (i=0; i<3;      i++) { xfd[i] =  i; xft[i] = xCONSOLE; }
+  for (i=3; i<NOFILE; i++) { xfd[i] = -1; xft[i] = xCLOSED;  }
   xexit(xmain(argc, argv));
 }
 
