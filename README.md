@@ -1,13 +1,19 @@
-swieros
+v9-ucore
 =======
-A tiny and fast Unix-ish kernel (based on xv6), compiler, and userland for fun, education, and research.
 
-Virtual CPU with full user/supervisor and virtual memory support, fast enough to support self-emulation.
+This project tries to migrate Tsinghua ucore system on to an modified **swieros** we call it (v9-cpu). 
 
-Fast C-subset compiler allowing on-the-fly compile-and-go of all applications.
 
-Network clients & servers, remote OpenGL, GUI applications, and many other nifty features.
+> swieros
 
-Runs under Windows or Linux.
+> A tiny and fast Unix-ish kernel (based on xv6), compiler, and userland for fun, education, and research.
 
-See the 00README.txt for full details and a step-by-step walkthrough tutorial.
+> Virtual CPU with full user/supervisor and virtual memory support, fast enough to support self-emulation.
+
+> Fast C-subset compiler allowing on-the-fly compile-and-go of all applications.
+
+> Network clients & servers, remote OpenGL, GUI applications, and many other nifty features.
+
+> Runs under Windows or Linux.
+
+> See the 00README.txt for full details and a step-by-step walkthrough tutorial.
