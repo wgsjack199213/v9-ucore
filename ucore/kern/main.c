@@ -1,4 +1,3 @@
-// os.c - based on xv6 with heavy modifications
 #include <u.h>
 #include <defs.h>
 #include <list.h>
@@ -17,7 +16,7 @@ void kern_init() {
 
     // extern char edata[], end[];
 
-    // memset(edata, 0, 
+    // memset(edata, 0,
     //  - edata);
 
     // cons_init();                // init the console
@@ -26,14 +25,14 @@ void kern_init() {
 
     // // // //pmm_init();                 // init physical memory management
 
-    idt_init();                 // init interrupt descriptor table    
-    
+    idt_init();                 // init interrupt descriptor table
+
     stmr(128*1024);             // init clock interrupt
-    
+
     asm(STI);                   // enable irq interrupt
 
     // while (1) {
-    //                             // do nothing   
+    //                             // do nothing
     // }
 }
 
