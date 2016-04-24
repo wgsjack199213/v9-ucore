@@ -1,3 +1,5 @@
+#ifndef U_H
+#define U_H
 // u.h
 
 // instruction set
@@ -35,3 +37,5 @@ enum {
 typedef unsigned char uchar;
 typedef unsigned short ushort;
 typedef unsigned int uint;
+
+#endif
