@@ -6,6 +6,9 @@ void *memcpy(void *d, void *s, uint n) { asm(LL,8); asm(LBL, 16); asm(LCL,24); a
 void *memset(void *d, uint c,  uint n) { asm(LL,8); asm(LBLB,16); asm(LCL,24); asm(MSET); asm(LL,8); }  //memset并返回地址
 void *memchr(void *s, uint c,  uint n) { asm(LL,8); asm(LBLB,16); asm(LCL,24); asm(MCHR); }             //memchar并返回地址
 
+// void structcpy(void *d, void *s, uint n) {
+//     memcpy(d, s, n);
+// }
 // int strlen(void *s) {                     //获取str长度
 //   return memchr(s, 0, -1) - s;
 // }

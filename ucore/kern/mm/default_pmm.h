@@ -176,10 +176,10 @@ default_nr_free_pages(void) {
 
 void
 basic_check() {
-    struct Page *p0, *p1, *p2;
-    list_entry_t free_list_store;
+    struct Page *p0, *p1, *p2, *p;
+    struct list_entry free_list_store;
     uint nr_free_store;
-    struct Page *p;
+    
 
     p0 = p1 = p2 = NULL;
     assert((p0 = alloc_page()) != NULL);
@@ -194,6 +194,7 @@ basic_check() {
     assert(page2pa(p2) < npage * PGSIZE);
 
     // free_list_store = free_list;
+    memcpy(&free_list_store, &free_list, sizeof(struct list_entry));
     list_init(&free_list);
     assert(list_empty(&free_list));
 
@@ -222,6 +223,7 @@ basic_check() {
 
     assert(nr_free == 0);
     // free_list = free_list_store;
+    memcpy(&free_list, &free_list_store, sizeof(struct list_entry));
     nr_free = nr_free_store;
 
     free_page(p);
@@ -229,70 +231,77 @@ basic_check() {
     free_page(p2);
 }
 
-// // LAB2: below code is used to check the first fit allocation algorithm (your EXERCISE 1) 
-// // NOTICE: You SHOULD NOT CHANGE basic_check, default_check functions!
-// static void
-// default_check(void) {
-//     int count = 0, total = 0;
-//     list_entry_t *le = &free_list;
-//     while ((le = list_next(le)) != &free_list) {
-//         struct Page *p = le2page(le, page_link);
-//         assert(PageProperty(p));
-//         count ++, total += p->property;
-//     }
-//     assert(total == nr_free_pages());
+// LAB2: below code is used to check the first fit allocation algorithm (your EXERCISE 1) 
+// NOTICE: You SHOULD NOT CHANGE basic_check, default_check functions!
+void
+default_check(void) {
+    struct Page * p0, *p1, *p2, *p;
+    struct list_entry *le = &free_list;
+    struct list_entry free_list_store;
+    uint nr_free_store;
+    int count, total;
+    count = 0;
+    total = 0;
+    while ((le = list_next(le)) != &free_list) {
+        p = le2page(le, page_link);
+        assert(PageProperty(p));
+        count ++, total += p->property;
+    }
+    assert(total == nr_free_pages());
 
-//     basic_check();
+    basic_check();
 
-//     struct Page *p0 = alloc_pages(5), *p1, *p2;
-//     assert(p0 != NULL);
-//     assert(!PageProperty(p0));
+    p0 = alloc_pages(5);
+    assert(p0 != NULL);
+    assert(!PageProperty(p0));
 
-//     list_entry_t free_list_store = free_list;
-//     list_init(&free_list);
-//     assert(list_empty(&free_list));
-//     assert(alloc_page() == NULL);
+    // free_list_store = free_list;
+    memcpy(&free_list_store, &free_list, sizeof(struct list_entry));
+    list_init(&free_list);
+    assert(list_empty(&free_list));
+    assert(alloc_page() == NULL);
 
-//     unsigned int nr_free_store = nr_free;
-//     nr_free = 0;
+    nr_free_store = nr_free;
+    nr_free = 0;
 
-//     free_pages(p0 + 2, 3);
-//     assert(alloc_pages(4) == NULL);
-//     assert(PageProperty(p0 + 2) && p0[2].property == 3);
-//     assert((p1 = alloc_pages(3)) != NULL);
-//     assert(alloc_page() == NULL);
-//     assert(p0 + 2 == p1);
+    free_pages(p0 + 2, 3);
+    assert(alloc_pages(4) == NULL);
+    assert(PageProperty(p0 + 2) && p0[2].property == 3);
+    assert((p1 = alloc_pages(3)) != NULL);
+    assert(alloc_page() == NULL);
+    assert(p0 + 2 == p1);
 
-//     p2 = p0 + 1;
-//     free_page(p0);
-//     free_pages(p1, 3);
-//     assert(PageProperty(p0) && p0->property == 1);
-//     assert(PageProperty(p1) && p1->property == 3);
+    p2 = p0 + 1;
+    free_page(p0);
+    free_pages(p1, 3);
+    assert(PageProperty(p0) && p0->property == 1);
+    assert(PageProperty(p1) && p1->property == 3);
 
-//     assert((p0 = alloc_page()) == p2 - 1);
-//     free_page(p0);
-//     assert((p0 = alloc_pages(2)) == p2 + 1);
+    assert((p0 = alloc_page()) == p2 - 1);
+    free_page(p0);
+    assert((p0 = alloc_pages(2)) == p2 + 1);
 
-//     free_pages(p0, 2);
-//     free_page(p2);
+    free_pages(p0, 2);
+    free_page(p2);
 
-//     assert((p0 = alloc_pages(5)) != NULL);
-//     assert(alloc_page() == NULL);
+    assert((p0 = alloc_pages(5)) != NULL);
+    assert(alloc_page() == NULL);
 
-//     assert(nr_free == 0);
-//     nr_free = nr_free_store;
+    assert(nr_free == 0);
+    nr_free = nr_free_store;
 
-//     free_list = free_list_store;
-//     free_pages(p0, 5);
+    // free_list = free_list_store;
+    memcpy(&free_list, &free_list_store, sizeof(struct list_entry));
+    free_pages(p0, 5);
 
-//     le = &free_list;
-//     while ((le = list_next(le)) != &free_list) {
-//         struct Page *p = le2page(le, page_link);
-//         count --, total -= p->property;
-//     }
-//     assert(count == 0);
-//     assert(total == 0);
-// }
+    le = &free_list;
+    while ((le = list_next(le)) != &free_list) {
+        p = le2page(le, page_link);
+        count --, total -= p->property;
+    }
+    assert(count == 0);
+    assert(total == 0);
+}
 
 void load_default_pmm_manager() {
   default_pmm_manager.name = "default_pmm_manager";
@@ -301,7 +310,7 @@ void load_default_pmm_manager() {
   default_pmm_manager.alloc_pages = default_alloc_pages;
   default_pmm_manager.free_pages = default_free_pages;
   default_pmm_manager.nr_free_pages = default_nr_free_pages;
-  // default_pmm_manager.check = default_check,
+  default_pmm_manager.check = default_check;
 }
 
 

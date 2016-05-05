@@ -23,7 +23,7 @@ void kern_init() {
 
     printf("(THU.CST) os is loading ...\n");
 
-    // // // //pmm_init();                 // init physical memory management
+    pmm_init();                 // init physical memory management
 
     idt_init();                 // init interrupt descriptor table
 
@@ -37,5 +37,8 @@ void kern_init() {
 }
 
 main() {
-  kern_init();
+    static int bss;     // last variable in bss segment
+    endbss = &bss;
+    printf("%d\n", endbss);
+    kern_init();
 }
