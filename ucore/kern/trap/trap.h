@@ -89,8 +89,8 @@ uint trap_in_kernel(struct trapframe *tf) {
 
 void print_regs(struct pushregs *regs) {
     printf("  SP : 0x%x\n", regs -> sp);
-    printf("  REG_G : %f\n", regs -> g);
-    printf("  REG_F : %f\n", regs -> f);
+    // printf("  REG_G : %f\n", regs -> g);
+    // printf("  REG_F : %f\n", regs -> f);
     printf("  REG_A : 0x%x\n", regs -> a);
     printf("  REG_B : 0x%x\n", regs -> b);
     printf("  REG_C : 0x%x\n", regs -> c);
@@ -104,7 +104,7 @@ void print_trapframe(struct trapframe *tf) {
     }else{
       printf("Trap in kernel!\n");
     }
-    printf("Error Code: %d\n", tf->fc);
+    printf("Error Code: %e\n", tf->fc);
     printf("PC : 0x%x\n", tf->pc);
     printf("\n");
 }
