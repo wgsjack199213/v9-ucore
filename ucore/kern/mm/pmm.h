@@ -149,7 +149,6 @@ page_ref_dec(struct Page *page) {
 pte_t *  vpt = (pte_t *)(VPT);
 pde_t *  vpd = (pde_t *)PGADDR(PDX(VPT), PDX(VPT), 0);
 
-
 // pmm_manager is a physical memory management class. A special pmm manager - XXX_pmm_manager
 // only needs to implement the methods in pmm_manager class, then XXX_pmm_manager can be used
 // by ucore to manage the total physical memory space.
@@ -183,17 +182,61 @@ init_memmap(struct Page *base, size_t n) {
     call2(base, n, pmm_manager->init_memmap);
 }
 
+struct mm_struct;
+
+// the virtual continuous memory area(vma)
+struct vma_struct {
+    struct mm_struct *vm_mm;        // the set of vma using the same PDT
+    uintptr_t vm_start;             //    start addr of vma
+    uintptr_t vm_end;               // end addr of vma
+    uint32_t vm_flags;              // flags of vma
+    list_entry_t list_link;         // linear list link which sorted by start addr of vma
+};
+
+// the control struct for a set of vma using the same PDT
+struct mm_struct {
+    list_entry_t mmap_list;         // linear list link which sorted by start addr of vma
+    struct vma_struct *mmap_cache;  // current accessed vma, used for speed purpose
+    pde_t *pgdir;                   // the PDT of these vma
+    int map_count;                  // the count of these vma
+    void *sm_priv;                  // the private data for swap manager
+};
+
+int swap_init_ok = 0;
+
+struct mm_struct *check_mm_struct;
+
+int swap_out(struct mm_struct *mm, int n, int in_tick);
+
 //alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE memory
 struct Page *
 alloc_pages(size_t n) {
+
     struct Page *page=NULL;
     bool intr_flag;
-    local_intr_save(intr_flag);
+    
+    while (1)
     {
-        page = call1(n, pmm_manager->alloc_pages);
+         local_intr_save(intr_flag);
+         {
+            page = call1(n, pmm_manager->alloc_pages);
+         }
+         local_intr_restore(intr_flag);
+
+         if (page != NULL || n > 1 || swap_init_ok == 0) break;
+         
+         swap_out(check_mm_struct, n, 0);
     }
-    local_intr_restore(intr_flag);
     return page;
+
+    // struct Page *page=NULL;
+    // bool intr_flag;
+    // local_intr_save(intr_flag);
+    // {
+    //     page = call1(n, pmm_manager->alloc_pages);
+    // }
+    // local_intr_restore(intr_flag);
+    // return page;
 }
 
 //free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
@@ -221,8 +264,7 @@ nr_free_pages(void) {
 }
 
 // pmm_init - initialize the physical memory management
-static void
-page_init(void) {
+void page_init(void) {
     uintptr_t freemem;
     uint32_t maxpa, begin, end;
     int i;
@@ -246,8 +288,7 @@ page_init(void) {
     }
 }
 
-static void
-enable_paging() {
+void enable_paging() {
     pdir(boot_cr3);
     spage(1);
 }
@@ -257,8 +298,7 @@ boot_alloc_page - allocate one page using pmm->alloc_pages(1)
 return value: the kernel virtual address of this allocated page
 note: this function is used to get the memory for PDT(Page Directory Table)&PT(Page Table)
 */
-static void *
-boot_alloc_page(void) {
+void* boot_alloc_page(void) {
     struct Page *p = alloc_page();
     if (p == NULL) {
         panic("boot_alloc_page failed.\n");
@@ -281,11 +321,11 @@ boot_alloc_page(void) {
     return vaule: the kernel virtual address of this pte
 */
 
-static pte_t *
-get_pte(pde_t *pgdir, uintptr_t la, bool create) {
+pte_t* get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     pde_t *pdep = &pgdir[PDX(la)];
     struct Page *page;
     uintptr_t pa;
+    // printf("%x %x %x\n", la, PDX(la), PTX(last));
     /* LAB2 EXERCISE 2: YOUR CODE
      *
      * If you need to visit a physical address, please use KADDR()
@@ -333,8 +373,7 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
-static struct Page *
-get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
+struct Page* get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
     pte_t *ptep = get_pte(pgdir, la, 0);
     if (ptep_store != NULL) {
         *ptep_store = ptep;
@@ -350,8 +389,7 @@ page_remove_pte - free an Page sturct which is related linear address la
                - and clean(invalidate) pte which is related linear address la
 note: PT is changed, so the TLB need to be invalidate
 */
-void
-page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
+void page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
     /* LAB2 EXERCISE 3: YOUR CODE
      *
      * Please check if ptep is valid, and tlb must be manually updated if mapping is updated
@@ -388,8 +426,7 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte
-void
-page_remove(pde_t *pgdir, uintptr_t la) {
+void page_remove(pde_t *pgdir, uintptr_t la) {
     pte_t *ptep = get_pte(pgdir, la, 0);
     if (ptep != NULL) {
         page_remove_pte(pgdir, la, ptep);
@@ -408,8 +445,7 @@ page_remove(pde_t *pgdir, uintptr_t la) {
     return value: always 0
     note: PT is changed, so the TLB need to be invalidate
 */
-int
-page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
+int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
     pte_t *ptep = get_pte(pgdir, la, 1);
     struct Page *p;
     if (ptep == NULL) {
@@ -430,14 +466,36 @@ page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
     return 0;
 }
 
-static void
-check_alloc_page(void) {
+
+int swap_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in);
+// pgdir_alloc_page - call alloc_page & page_insert functions to 
+//                  - allocate a page size memory & setup an addr map
+//                  - pa<->la with linear address la and the PDT pgdir
+struct Page *
+pgdir_alloc_page(pde_t *pgdir, uintptr_t la, uint32_t perm) {
+    struct Page *page = alloc_page();
+    if (page != NULL) {
+        if (page_insert(pgdir, page, la, perm) != 0) {
+            free_page(page);
+            return NULL;
+        }
+        if (swap_init_ok){
+            swap_map_swappable(check_mm_struct, la, page, 0);
+            page->pra_vaddr=la;
+            assert(page_ref(page) == 1);
+        }
+
+    }
+
+    return page;
+}
+
+void check_alloc_page(void) {
     call0(pmm_manager->check);
     printf("check_alloc_page() succeeded!\n");
 }
 
-static void
-check_pgdir(void) {
+void check_pgdir(void) {
     struct Page *p1, *p2;
     pte_t *ptep;
     
@@ -494,8 +552,7 @@ check_pgdir(void) {
         perm: permission of this memory
 */
 
-static void
-boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, uintptr_t pa, uint32_t perm) {
+void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, uintptr_t pa, uint32_t perm) {
     size_t n = ROUNDUP(size + PGOFF(la), PGSIZE) / PGSIZE;
     pte_t * ptep;
     assert(PGOFF(la) == PGOFF(pa));
@@ -508,8 +565,7 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, uintptr_t pa, uint32_t
     }
 }
 
-static void
-check_boot_pgdir(void) {
+void check_boot_pgdir(void) {
     pte_t *ptep;
     int i;
     struct Page *p;
@@ -572,8 +628,7 @@ perm2str(int perm) {
     
     return value: 0 - not a invalid item range, perm - a valid item range with perm permission
 */
-static int
-get_pgtable_items(size_t left, size_t right, size_t start, uintptr_t *table, size_t *left_store, size_t *right_store) {
+int get_pgtable_items(size_t left, size_t right, size_t start, uintptr_t *table, size_t *left_store, size_t *right_store) {
     int perm;
     if (start >= right) {
         return 0;
@@ -620,10 +675,24 @@ void print_pgdir(void) {
     printf("--------------------- END ---------------------\n");
 }
 
-void check_and_return(void) {
-    int *ksp;              // temp kernel stack pointer
+void check_and_return() {
     list_entry_t *head = &free_area.free_list;
+
+int i;
+    //reload gdt(third time,the last time) to map all physical memory
+    //virtual_addr 0~4G=liear_addr 0~4G
+    //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS  
+    boot_pgdir = (uint)(boot_pgdir) + KERNBASE;
+
+    //disable the map of virtual_addr 0~4M
+    boot_pgdir[0] = 0;
     
+
+    
+    for (i = 0; i < 1024; i++)
+
+        printf("%x %x\n", i, boot_pgdir[i]);
+
     load_default_pmm_manager();
     pmm_manager = &default_pmm_manager;
     
@@ -637,21 +706,19 @@ void check_and_return(void) {
     
     check_boot_pgdir();
     print_pgdir();
-    
-    *ksp = *(uint *)(tmp + 4 + KERNBASE) + KERNBASE;
-    asm(LL, 4);
-    asm(SSP);
-    asm(LEV);
 }
+
+uint getsp() {
+    asm(LEA, 8);
+}
+
+static char kstack[4096]; // temp kernel stack
 
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
-pmm_init(void) {
+pmm_init() {
     int *ksp;              // temp kernel stack pointer
-    static char kstack[1024]; // temp kernel stack
-
-    tmp = (&ksp);
 
     page_enable = 0;
     //We need to alloc/free the physical memory (granularity is 4KB or other size).
@@ -689,29 +756,46 @@ pmm_init(void) {
     //virtual_addr 3G~3G+4M = linear_addr 0~4M = linear_addr 3G~3G+4M = phy_addr 0~4M
     boot_pgdir[0] = boot_pgdir[PDX(KERNBASE)];
 
-    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
-    asm(LL, 4);
-    asm(SSP);
-
+    page_enable = 1;
+    
     pdir(boot_cr3);
     spage(1);
-    page_enable = 1;
 
-    //reload gdt(third time,the last time) to map all physical memory
-    //virtual_addr 0~4G=liear_addr 0~4G
-    //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS
-    
-    boot_pgdir = (uint)(boot_pgdir) + KERNBASE;
-    //disable the map of virtual_addr 0~4M
-    boot_pgdir[0] = 0;
-
-    // //now the basic virtual memory map(see memalyout.h) is established.
-    // //check the correctness of the basic virtual memory map.
-    ksp = KERNBASE+(((uint)kstack + sizeof(kstack) - 8) & -8);
-    *ksp = KERNBASE + (uint)(check_and_return);
+    //now the basic virtual memory map(see memalyout.h) is established.
+    //check the correctness of the basic virtual memory map.
+    ksp = KERNBASE + getsp();
     asm(LL, 4);
     asm(SSP);
-    asm(LEV);
+    *(uint *)(getsp()+8) += KERNBASE;
+    *(uint *)(getsp()+16) += KERNBASE;
+
+    ksp = (uint)(check_and_return) + KERNBASE;
+    asm(LL, 4);
+    asm(JSRA);
+
+}
+
+
+void *
+kmalloc(size_t n) {
+    void * ptr=NULL;
+    struct Page *base=NULL;
+    int num_pages=(n+PGSIZE-1)/PGSIZE;
+    assert(n > 0 && n < 1024*0124);
+    base = alloc_pages(num_pages);
+    assert(base != NULL);
+    ptr=page2kva(base);
+    return ptr;
+}
+
+void 
+kfree(void *ptr, size_t n) {
+    struct Page *base=NULL;
+    int num_pages=(n+PGSIZE-1)/PGSIZE;
+    assert(n > 0 && n < 1024*0124);
+    assert(ptr != NULL);
+    base = kva2page(ptr);
+    free_pages(base, num_pages);
 }
 
 #endif /* !__KERN_MM_PMM_H__ */

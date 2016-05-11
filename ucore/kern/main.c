@@ -7,10 +7,12 @@
 #include <sync.h>
 #include <trap.h>
 #include <default_pmm.h>
-// #include <pmm.h>
+// #include <fs.h>
+// #include <swap_fifo.h>
+#include <swap.h>
 
 void kern_init() {
-
+    int i;
     // extern char edata[], end[];
 
     // memset(edata, 0,
@@ -24,17 +26,34 @@ void kern_init() {
 
     idt_init();                 // init interrupt descriptor table
 
-    stmr(128*1024*1000);             // init clock interrupt
-
     asm(STI);                   // enable irq interrupt
 
-    while (1) {
-                                // do nothing
-    }
+    for (i = 0; i < 1024; i++)
+
+        printf("%d %d\n", i, boot_pgdir[i]);
+
+    vmm_init();                 // init virtual memory management
+
+    swap_init();                // init swap
+
+    stmr(128*1024*1000);        // init clock interrupt
+
+    // while (1) {
+    //                             // do nothing
+    // }
 }
 
 main() {
+    int *ksp;              // temp kernel stack pointer
+
     static int bss;     // last variable in bss segment
     endbss = &bss;
+
+    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
+    asm(LL, 4);
+    asm(SSP);
+
     kern_init();
+
+    asm(HALT);
 }

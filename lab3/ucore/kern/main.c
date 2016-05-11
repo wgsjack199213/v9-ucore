@@ -7,10 +7,14 @@
 #include <sync.h>
 #include <trap.h>
 #include <default_pmm.h>
-// #include <pmm.h>
+// #include <fs.h>
+// #include <swap_fifo.h>
+#include <swap.h>
+
+static char disk[1 * 8 * 1024 * 512];
 
 void kern_init() {
-
+    
     // extern char edata[], end[];
 
     // memset(edata, 0,
@@ -28,13 +32,22 @@ void kern_init() {
 
     asm(STI);                   // enable irq interrupt
 
-    while (1) {
-                                // do nothing
-    }
+    // while (1) {
+    //                             // do nothing
+    // }
 }
 
 main() {
+    int *ksp;              // temp kernel stack pointer
+
     static int bss;     // last variable in bss segment
     endbss = &bss;
+
+    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
+    asm(LL, 4);
+    asm(SSP);
+
     kern_init();
+
+    asm(HALT);
 }

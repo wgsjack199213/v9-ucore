@@ -66,14 +66,12 @@
 #define free_list (free_area.free_list)
 #define nr_free (free_area.nr_free)
 
-static void
-default_init(void) {
+void default_init(void) {
     list_init(&free_list);
     nr_free = 0;
 }
 
-static void
-default_init_memmap(struct Page *base, size_t n) {
+void default_init_memmap(struct Page *base, size_t n) {
     struct Page *p;
     assert(n > 0);
     p = base;
@@ -89,8 +87,7 @@ default_init_memmap(struct Page *base, size_t n) {
     base->property = n;
 }
 
-static struct Page *
-default_alloc_pages(size_t n) {
+struct Page* default_alloc_pages(size_t n) {
     list_entry_t *le, *len;
     struct Page *p, *pp, *ppp;
     int i;
@@ -123,8 +120,7 @@ default_alloc_pages(size_t n) {
     return NULL;
 }
 
-static void
-default_free_pages(struct Page *base, size_t n) {
+void default_free_pages(struct Page *base, size_t n) {
     list_entry_t *le;
     struct Page * p;
     assert(n > 0);
@@ -170,13 +166,11 @@ default_free_pages(struct Page *base, size_t n) {
     return ;
 }
 
-static size_t
-default_nr_free_pages(void) {
+size_t default_nr_free_pages(void) {
     return nr_free;
 }
 
-void
-basic_check() {
+void basic_check() {
     struct Page *p0, *p1, *p2, *p;
     struct list_entry free_list_store;
     uint nr_free_store;
@@ -313,16 +307,6 @@ void load_default_pmm_manager() {
   default_pmm_manager.nr_free_pages = default_nr_free_pages;
   default_pmm_manager.check = default_check;
 }
-
-// void refresh_default_pmm_manager() {
-//   default_pmm_manager.name = "default_pmm_manager";
-//   default_pmm_manager.init = default_init;
-//   default_pmm_manager.init_memmap = default_init_memmap;
-//   default_pmm_manager.alloc_pages = default_alloc_pages;
-//   default_pmm_manager.free_pages = default_free_pages;
-//   default_pmm_manager.nr_free_pages = default_nr_free_pages;
-//   default_pmm_manager.check = default_check;
-// }
 
 #endif /* ! __KERN_MM_DEFAULT_PMM_H__ */
 

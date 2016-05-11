@@ -29,4 +29,9 @@ void call3(int arg0, int arg1, int arg2, funcptr_t func) {
   asm(LEV);
 }
 
+void call4(int arg0, int arg1, int arg2, int arg3, funcptr_t func) {
+  asm(LL, 40);
+  asm(PSHA);
+  asm(LEV);
+}
 #endif
