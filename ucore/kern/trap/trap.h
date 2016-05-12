@@ -97,21 +97,46 @@ void print_regs(struct pushregs *regs) {
 }
 
 void print_trapframe(struct trapframe *tf) {
-    printf("trapframe at %x\n", tf);
-    print_regs(&tf->tf_regs);
-    if (!trap_in_kernel(tf)) {
-      printf("Trap in usermode!\n");
-    }else{
-      printf("Trap in kernel!\n");
-    }
-    printf("Error Code: %e\n", tf->fc);
+    // printf("trapframe at %x\n", tf);
+    // print_regs(&tf->tf_regs);
+    // if (!trap_in_kernel(tf)) {
+    //   printf("Trap in usermode!\n");
+    // }else{
+    //   printf("Trap in kernel!\n");
+    // }
+    // printf("Error Code: %e\n", tf->fc);
     printf("PC : 0x%x\n", tf->pc);
     printf("\n");
 }
 
+
+void print_pgfault(struct trapframe *tf) {
+    /* error_code:
+     * bit 0 == 0 means no page found, 1 means protection fault
+     * bit 1 == 0 means read, 1 means write
+     * bit 2 == 0 means kernel, 1 means user
+     * */
+    printf("page fault at 0x%x: %c/%c [%s].\n", lvadr(),
+            (tf->fc >= USER) ? 'U' : 'K',
+            (tf->fc == FWPAGE || tf->fc == USER + FWPAGE) ? 'W' : 'R',
+            (tf->tf_regs.b & 1) ? "protection fault" : "no page found");
+}
+
+int do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr);
+
+int pgfault_handler(struct trapframe *tf) {
+    print_pgfault(tf);
+    if (check_mm_struct != NULL) {
+        return do_pgfault(check_mm_struct, tf->fc, lvadr());
+    }
+    panic("unhandled page fault.\n");
+}
+
+
 void trap_dispatch(struct trapframe *tf)
 {
   uint va;
+  uint ret;
   print_trapframe(tf);
   switch (tf -> fc) {
     case FSYS: panic("FSYS from kernel");
@@ -152,6 +177,12 @@ void trap_dispatch(struct trapframe *tf)
     case FWPAGE + USER:
     case FRPAGE:
     case FRPAGE + USER:
+      if ((ret = pgfault_handler(tf)) != 0) {
+            print_trapframe(tf);
+            panic("handle pgfault failed. %e\n", ret);
+      }
+      printf("%x %x\n", *(char*)lvadr(), lvadr());
+      spage(1);
       return;
     case FTIMER:
     case FTIMER + USER:

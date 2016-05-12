@@ -384,6 +384,15 @@ struct Page* get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
     return NULL;
 }
 
+tlb_clear_enable = 0;
+
+// invalidate a TLB entry, but only if the page tables being
+// edited are the ones currently in use by the processor.
+void tlb_invalidate(pde_t *pgdir, uintptr_t la) {
+    if (tlb_clear_enable)
+        spage(1);
+}
+
 /*
 page_remove_pte - free an Page sturct which is related linear address la
                - and clean(invalidate) pte which is related linear address la
@@ -422,6 +431,7 @@ void page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
             free_page(page);
         }
         *ptep = 0;
+        tlb_invalidate(pgdir, la);
     }
 }
 
@@ -463,6 +473,8 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
         }
     }
     *ptep = page2pa(page) | PTE_P | perm;
+
+    tlb_invalidate(pgdir, la);
     return 0;
 }
 
@@ -678,7 +690,7 @@ void print_pgdir(void) {
 void check_and_return() {
     list_entry_t *head = &free_area.free_list;
 
-int i;
+    // int i;
     //reload gdt(third time,the last time) to map all physical memory
     //virtual_addr 0~4G=liear_addr 0~4G
     //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS  
@@ -686,13 +698,7 @@ int i;
 
     //disable the map of virtual_addr 0~4M
     boot_pgdir[0] = 0;
-    
-
-    
-    for (i = 0; i < 1024; i++)
-
-        printf("%x %x\n", i, boot_pgdir[i]);
-
+        
     load_default_pmm_manager();
     pmm_manager = &default_pmm_manager;
     
@@ -772,7 +778,6 @@ pmm_init() {
     ksp = (uint)(check_and_return) + KERNBASE;
     asm(LL, 4);
     asm(JSRA);
-
 }
 
 

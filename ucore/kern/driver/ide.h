@@ -27,7 +27,8 @@ ide_read_secs(unsigned short ideno, uint32_t secno, void *dst, size_t nsecs) {
 
     for (; nsecs > 0; nsecs --, dst += SECTSIZE, secno += SECTSIZE) {
         for (i = 0; i < SECTSIZE; i++) {
-            *((char *)(dst) + i) = *((char *)(secno) + i);
+            // *((char *)(dst) + i) = *((char *)(secno) + i);
+            *((char *)(dst) + i) = disk[secno + i];
         }
 
     }
@@ -45,7 +46,8 @@ ide_write_secs(unsigned short ideno, uint32_t secno, uint32_t *src, size_t nsecs
 
     for (; nsecs > 0; nsecs --, src += SECTSIZE, secno += SECTSIZE) {
         for (i = 0; i < SECTSIZE; i++) {
-            *((char *)(secno) + i) = *((char *)(src) + i);
+            // *((char *)(secno) + i) = *((char *)(src) + i);
+            disk[secno + i] = *((char *)(src) + i);
         }
 
     }

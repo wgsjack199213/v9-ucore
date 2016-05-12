@@ -161,12 +161,10 @@ void
 mm_destroy(struct mm_struct *mm) {
 
     list_entry_t *list = &(mm->mmap_list), *le;
-    printf("%d\n", nr_free_pages());
     while ((le = list_next(list)) != list) {
         list_del(le);
         kfree(le2vma(le, list_link), sizeof(struct vma_struct));  //kfree vma        
     }
-    printf("%d\n", nr_free_pages());
     kfree(mm, sizeof(struct mm_struct)); //kfree mm
     mm=NULL;
 }
@@ -246,12 +244,9 @@ void check_pgfault(void) {
     uintptr_t addr;
     int i, sum;
     
-    printf("before create %d\n", nr_free_pages());
     
     check_mm_struct = mm_create();
     assert(check_mm_struct != NULL);
-
-    printf("after create %d\n", nr_free_pages());
 
     mm = check_mm_struct;
     pgdir = mm->pgdir = boot_pgdir;
@@ -281,24 +276,17 @@ void check_pgfault(void) {
 
     page_remove(pgdir, ROUNDDOWN(addr, PGSIZE));
 
-    printf("%x %x\n", pde2page(pgdir[0]), pgdir);
     free_page(pde2page(pgdir[0]));
-
-    printf("%d\n", nr_free_pages());
 
     pgdir[0] = 0;
 
-    printf("before destory%d\n", nr_free_pages());
 
     mm->pgdir = NULL;
     mm_destroy(mm);
     check_mm_struct = NULL;
 
-    printf("after destory%d\n", nr_free_pages());    
-    printf("%d\n", nr_free_pages_store);
-
     assert(nr_free_pages_store == nr_free_pages());
-
+    
     printf("check_pgfault() succeeded!\n");
 }
 
@@ -363,28 +351,33 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         // goto failed;
         return ret;
     }
+    
     //check the error_code
-    switch (error_code & 3) {
-    default:
-            /* error code flag : default is 3 ( W/R=1, P=1): write, present */
-    case 2: /* error code flag : (W/R=1, P=0): write, not present */
-        if (!(vma->vm_flags & VM_WRITE)) {
-            printf("do_pgfault failed: error code flag = write AND not present, but the addr's vma cannot write\n");
-            // goto failed;
-            return ret;
-        }
-        break;
-    case 1: /* error code flag : (W/R=0, P=1): read, present */
-        printf("do_pgfault failed: error code flag = read AND present\n");
-        // goto failed;
-        return ret;
-    case 0: /* error code flag : (W/R=0, P=0): read, not present */
-        if (!(vma->vm_flags & (VM_READ | VM_EXEC))) {
-            printf("do_pgfault failed: error code flag = read AND not present, but the addr's vma cannot read or exec\n");
-            // goto failed;
-            return ret;
-        }
-    }
+    // switch (error_code & 3) {
+    // default:
+    //         // error code flag : default is 3 ( W/R=1, P=1): write, present
+    // case 2: 
+    //     // error code flag : (W/R=1, P=0): write, not present
+    //     if (!(vma->vm_flags & VM_WRITE)) {
+    //         printf("do_pgfault failed: error code flag = write AND not present, but the addr's vma cannot write\n");
+    //         // goto failed;
+    //         return ret;
+    //     }
+    //     break;
+    // case 1: 
+    //     // error code flag : (W/R=0, P=1): read, present
+    //     printf("do_pgfault failed: error code flag = read AND present\n");
+    //     // goto failed;
+    //     return ret;
+    // case 0: 
+    //     // error code flag : (W/R=0, P=0): read, not present
+    //     if (!(vma->vm_flags & (VM_READ | VM_EXEC))) {
+    //         printf("do_pgfault failed: error code flag = read AND not present, but the addr's vma cannot read or exec\n");
+    //         // goto failed;
+    //         return ret;
+    //     }
+    // }
+
     /* IF (write an existed addr ) OR
      *    (write an non_existed addr && addr is writable) OR
      *    (read  an non_existed addr && addr is readable)
@@ -452,16 +445,15 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
    //  #endif
     // try to find a pte, if pte's PT(Page Table) isn't existed, then create a PT.
     // (notice the 3th parameter '1')
+
     if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
         printf("get_pte in do_pgfault failed\n");
-        // goto failed;
         return ret;
     }
     
     if (*ptep == 0) { // if the phy addr isn't exist, then alloc a page & map the phy addr with logical addr
         if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
             printf("pgdir_alloc_page in do_pgfault failed\n");
-            // goto failed;
             return ret;
         }
     }
@@ -471,16 +463,18 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
             page=NULL;
             if ((ret = swap_in(mm, addr, &page)) != 0) {
                 printf("swap_in in do_pgfault failed\n");
-                // goto failed;
                 return ret;
-            }    
+            }
+            spage(1);
             page_insert(mm->pgdir, page, addr, perm);
             swap_map_swappable(mm, addr, page, 1);
             page->pra_vaddr = addr;
+            printf("address%x\n", addr);
+            printf("%x %x\n", *get_pte(boot_pgdir, addr, 0), addr);
+            printf("%x\n", *(char*)(addr));
         }
         else {
             printf("no swap_init_ok but ptep is %x, failed\n",*ptep);
-            // goto failed;
             return ret;
         }
    }

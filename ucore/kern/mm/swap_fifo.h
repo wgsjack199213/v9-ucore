@@ -41,7 +41,7 @@ int _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page,
 {
     list_entry_t *head=(list_entry_t*) mm->sm_priv;
     list_entry_t *entry=&(page->pra_page_link);
- 
+    
     assert(entry != NULL && head != NULL);
     //record the page access situlation
     /*LAB3 EXERCISE 2: YOUR CODE*/ 
@@ -60,7 +60,7 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
      list_entry_t *le;
      struct Page *p;
      list_entry_t *head = (list_entry_t*) mm->sm_priv;
-         assert(head != NULL);
+     assert(head != NULL);
      assert(in_tick==0);
      /* Select the victim */
      /*LAB3 EXERCISE 2: YOUR CODE*/ 
@@ -78,6 +78,7 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
 
 int
 _fifo_check_swap(void) {
+    int tmp;
     printf("write Virt Page c in fifo_check_swap\n");
     *(unsigned char *)0x3000 = 0x0c;
     assert(pgfault_num==4);
@@ -109,9 +110,15 @@ _fifo_check_swap(void) {
     *(unsigned char *)0x4000 = 0x0d;
     assert(pgfault_num==9);
     printf("write Virt Page e in fifo_check_swap\n");
+    printf("%x %x\n", *(unsigned char *)0x5000, *get_pte(boot_pgdir, 0x5000, 0));
     *(unsigned char *)0x5000 = 0x0e;
+    printf("%x\n", *(unsigned char *)0x5000);
     assert(pgfault_num==10);
     printf("write Virt Page a in fifo_check_swap\n");
+    tmp = *(unsigned char *)(0x1000);
+    printf("%x\n", tmp );
+    printf("%x\n", *(unsigned char *)0x1000);
+    printf("%x\n", *(unsigned char *)0x1000);
     assert(*(unsigned char *)0x1000 == 0x0a);
     *(unsigned char *)0x1000 = 0x0a;
     assert(pgfault_num==11);

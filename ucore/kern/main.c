@@ -5,14 +5,13 @@
 #include <string.h>
 #include <io.h>
 #include <sync.h>
-#include <trap.h>
 #include <default_pmm.h>
+#include <trap.h>
 // #include <fs.h>
 // #include <swap_fifo.h>
 #include <swap.h>
 
 void kern_init() {
-    int i;
     // extern char edata[], end[];
 
     // memset(edata, 0,
@@ -27,10 +26,10 @@ void kern_init() {
     idt_init();                 // init interrupt descriptor table
 
     asm(STI);                   // enable irq interrupt
-
-    for (i = 0; i < 1024; i++)
-
-        printf("%d %d\n", i, boot_pgdir[i]);
+    
+    tlb_clear_enable = 1;
+    
+    spage(1);
 
     vmm_init();                 // init virtual memory management
 
