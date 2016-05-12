@@ -23,7 +23,6 @@ swapfs_init(void) {
 
 int
 swapfs_read(swap_entry_t entry, struct Page *page) {
-	printf("swapfs_read %x %x\n", entry, page);
     return ide_read_secs(SWAP_DEV_NO, swap_offset(entry) * PAGE_NSECT, page2kva(page), PAGE_NSECT);
 }
 

@@ -110,15 +110,9 @@ _fifo_check_swap(void) {
     *(unsigned char *)0x4000 = 0x0d;
     assert(pgfault_num==9);
     printf("write Virt Page e in fifo_check_swap\n");
-    printf("%x %x\n", *(unsigned char *)0x5000, *get_pte(boot_pgdir, 0x5000, 0));
     *(unsigned char *)0x5000 = 0x0e;
-    printf("%x\n", *(unsigned char *)0x5000);
     assert(pgfault_num==10);
     printf("write Virt Page a in fifo_check_swap\n");
-    tmp = *(unsigned char *)(0x1000);
-    printf("%x\n", tmp );
-    printf("%x\n", *(unsigned char *)0x1000);
-    printf("%x\n", *(unsigned char *)0x1000);
     assert(*(unsigned char *)0x1000 == 0x0a);
     *(unsigned char *)0x1000 = 0x0a;
     assert(pgfault_num==11);

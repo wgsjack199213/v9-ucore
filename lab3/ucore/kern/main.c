@@ -37,9 +37,9 @@ void kern_init() {
 
     stmr(128*1024*1000);        // init clock interrupt
 
-    // while (1) {
-    //                             // do nothing
-    // }
+    while (1) {
+                                // do nothing
+    }
 }
 
 main() {

@@ -469,9 +469,6 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
             page_insert(mm->pgdir, page, addr, perm);
             swap_map_swappable(mm, addr, page, 1);
             page->pra_vaddr = addr;
-            printf("address%x\n", addr);
-            printf("%x %x\n", *get_pte(boot_pgdir, addr, 0), addr);
-            printf("%x\n", *(char*)(addr));
         }
         else {
             printf("no swap_init_ok but ptep is %x, failed\n",*ptep);

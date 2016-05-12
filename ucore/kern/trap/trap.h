@@ -181,7 +181,7 @@ void trap_dispatch(struct trapframe *tf)
             print_trapframe(tf);
             panic("handle pgfault failed. %e\n", ret);
       }
-      printf("%x %x\n", *(char*)lvadr(), lvadr());
+      tf->pc = (uint *)(tf->pc) - 1;
       spage(1);
       return;
     case FTIMER:
