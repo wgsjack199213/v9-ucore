@@ -5,16 +5,13 @@
 #include <string.h>
 #include <io.h>
 #include <sync.h>
-#include <trap.h>
 #include <default_pmm.h>
+#include <trap.h>
 // #include <fs.h>
 // #include <swap_fifo.h>
 #include <swap.h>
 
-static char disk[1 * 8 * 1024 * 512];
-
 void kern_init() {
-    
     // extern char edata[], end[];
 
     // memset(edata, 0,
@@ -28,9 +25,17 @@ void kern_init() {
 
     idt_init();                 // init interrupt descriptor table
 
-    stmr(128*1024*1000);             // init clock interrupt
-
     asm(STI);                   // enable irq interrupt
+    
+    tlb_clear_enable = 1;
+    
+    spage(1);
+
+    vmm_init();                 // init virtual memory management
+
+    swap_init();                // init swap
+
+    stmr(128*1024*1000);        // init clock interrupt
 
     // while (1) {
     //                             // do nothing

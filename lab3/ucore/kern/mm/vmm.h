@@ -17,34 +17,11 @@
 #define E_NO_FREE_PROC      5   // Attempt to create a new process beyond
 #define E_FAULT             6   // Memory fault
 
-
-#define le2vma(le, member)      to_struct((le), struct vma_struct, member)
-
 #define VM_READ                 0x00000001
 #define VM_WRITE                0x00000002
 #define VM_EXEC                 0x00000004
 
-struct mm_struct;
-
-// the virtual continuous memory area(vma)
-struct vma_struct {
-    struct mm_struct *vm_mm;        // the set of vma using the same PDT
-    uintptr_t vm_start;             //    start addr of vma
-    uintptr_t vm_end;               // end addr of vma
-    uint32_t vm_flags;              // flags of vma
-    list_entry_t list_link;         // linear list link which sorted by start addr of vma
-};
-
-// the control struct for a set of vma using the same PDT
-struct mm_struct {
-    list_entry_t mmap_list;         // linear list link which sorted by start addr of vma
-    struct vma_struct *mmap_cache;  // current accessed vma, used for speed purpose
-    pde_t *pgdir;                   // the PDT of these vma
-    int map_count;                  // the count of these vma
-    void *sm_priv;                  // the private data for swap manager
-};
-
-int swap_init_ok = 0;
+#define le2vma(le, member)      to_struct((le), struct vma_struct, member)
 
 /* 
   vmm design include two parts: mm_struct (mm) & vma_struct (vma)
@@ -72,24 +49,21 @@ int swap_init_ok = 0;
      void check_pgfault(void);
 */
 
-// static void check_vmm(void);
-// static void check_vma_struct(void);
-// static void check_pgfault(void);
-
+int swap_init_mm(struct mm_struct *mm);
 
 // mm_create -  alloc a mm_struct & initialize it.
 struct mm_struct *
 mm_create(void) {
     struct mm_struct *mm;
-    // mm = kmalloc(sizeof(struct mm_struct));
+    mm = kmalloc(sizeof(struct mm_struct));
     if (mm != NULL) {
         list_init(&(mm->mmap_list));
         mm->mmap_cache = NULL;
         mm->pgdir = NULL;
         mm->map_count = 0;
-        // if (swap_init_ok) 
-        //     swap_init_mm(mm);
-        // else 
+        if (swap_init_ok) 
+            swap_init_mm(mm);
+        else 
             mm->sm_priv = NULL;
     }
     return mm;
@@ -99,7 +73,7 @@ mm_create(void) {
 struct vma_struct *
 vma_create(uintptr_t vm_start, uintptr_t vm_end, uint32_t vm_flags) {
     struct vma_struct *vma;
-    // vma = kmalloc(sizeof(struct vma_struct));
+    vma = kmalloc(sizeof(struct vma_struct));
     if (vma != NULL) {
         vma->vm_start = vm_start;
         vma->vm_end = vm_end;
@@ -140,8 +114,7 @@ find_vma(struct mm_struct *mm, uintptr_t addr) {
 }
 
 // check_vma_overlap - check if vma1 overlaps vma2 ?
-static void
-check_vma_overlap(struct vma_struct *prev, struct vma_struct *next) {
+void check_vma_overlap(struct vma_struct *prev, struct vma_struct *next) {
     assert(prev->vm_start < prev->vm_end);
     assert(prev->vm_end <= next->vm_start);
     assert(next->vm_start < next->vm_end);
@@ -190,34 +163,13 @@ mm_destroy(struct mm_struct *mm) {
     list_entry_t *list = &(mm->mmap_list), *le;
     while ((le = list_next(list)) != list) {
         list_del(le);
-        // kfree(le2vma(le, list_link),sizeof(struct vma_struct));  //kfree vma        
+        kfree(le2vma(le, list_link), sizeof(struct vma_struct));  //kfree vma        
     }
-    // kfree(mm, sizeof(struct mm_struct)); //kfree mm
+    kfree(mm, sizeof(struct mm_struct)); //kfree mm
     mm=NULL;
 }
 
-// vmm_init - initialize virtual memory management
-//          - now just call check_vmm to check correctness of vmm
-void
-vmm_init(void) {
-    // check_vmm();
-}
-
-// check_vmm - check correctness of vmm
-static void
-check_vmm(void) {
-    size_t nr_free_pages_store = nr_free_pages();
-    
-    // check_vma_struct();
-    // check_pgfault();
-
-    assert(nr_free_pages_store == nr_free_pages());
-
-    printf("check_vmm() succeeded.\n");
-}
-
-static void
-check_vma_struct(void) {
+void check_vma_struct(void) {
     size_t nr_free_pages_store = nr_free_pages();
     int step1 = 10;
     int step2 = step1 * 10;
@@ -283,18 +235,16 @@ check_vma_struct(void) {
     printf("check_vma_struct() succeeded!\n");
 }
 
-struct mm_struct *check_mm_struct;
-
 // check_pgfault - check correctness of pgfault handler
-static void
-check_pgfault(void) {
+void check_pgfault(void) {
     size_t nr_free_pages_store = nr_free_pages();
     struct mm_struct *mm;
     struct vma_struct *vma;
     pde_t *pgdir;
     uintptr_t addr;
     int i, sum;
-
+    
+    
     check_mm_struct = mm_create();
     assert(check_mm_struct != NULL);
 
@@ -325,21 +275,44 @@ check_pgfault(void) {
     assert(sum == 0);
 
     page_remove(pgdir, ROUNDDOWN(addr, PGSIZE));
+
     free_page(pde2page(pgdir[0]));
+
     pgdir[0] = 0;
+
 
     mm->pgdir = NULL;
     mm_destroy(mm);
     check_mm_struct = NULL;
 
     assert(nr_free_pages_store == nr_free_pages());
-
+    
     printf("check_pgfault() succeeded!\n");
+}
+
+// check_vmm - check correctness of vmm
+void check_vmm(void) {
+    size_t nr_free_pages_store = nr_free_pages();
+    
+    check_vma_struct();
+    check_pgfault();
+
+    assert(nr_free_pages_store == nr_free_pages());
+
+    printf("check_vmm() succeeded.\n");
+}
+
+// vmm_init - initialize virtual memory management
+//          - now just call check_vmm to check correctness of vmm
+void
+vmm_init(void) {
+    check_vmm();
 }
 
 //page fault number
 unsigned int pgfault_num=0;
 
+int swap_in(struct mm_struct *mm, uintptr_t addr, struct Page **ptr_result);
 
 /* do_pgfault - interrupt handler to process the page fault execption
  * @mm         : the control struct for a set of vma using the same PDT
@@ -378,28 +351,33 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         // goto failed;
         return ret;
     }
+    
     //check the error_code
-    switch (error_code & 3) {
-    default:
-            /* error code flag : default is 3 ( W/R=1, P=1): write, present */
-    case 2: /* error code flag : (W/R=1, P=0): write, not present */
-        if (!(vma->vm_flags & VM_WRITE)) {
-            printf("do_pgfault failed: error code flag = write AND not present, but the addr's vma cannot write\n");
-            // goto failed;
-            return ret;
-        }
-        break;
-    case 1: /* error code flag : (W/R=0, P=1): read, present */
-        printf("do_pgfault failed: error code flag = read AND present\n");
-        // goto failed;
-        return ret;
-    case 0: /* error code flag : (W/R=0, P=0): read, not present */
-        if (!(vma->vm_flags & (VM_READ | VM_EXEC))) {
-            printf("do_pgfault failed: error code flag = read AND not present, but the addr's vma cannot read or exec\n");
-            // goto failed;
-            return ret;
-        }
-    }
+    // switch (error_code & 3) {
+    // default:
+    //         // error code flag : default is 3 ( W/R=1, P=1): write, present
+    // case 2: 
+    //     // error code flag : (W/R=1, P=0): write, not present
+    //     if (!(vma->vm_flags & VM_WRITE)) {
+    //         printf("do_pgfault failed: error code flag = write AND not present, but the addr's vma cannot write\n");
+    //         // goto failed;
+    //         return ret;
+    //     }
+    //     break;
+    // case 1: 
+    //     // error code flag : (W/R=0, P=1): read, present
+    //     printf("do_pgfault failed: error code flag = read AND present\n");
+    //     // goto failed;
+    //     return ret;
+    // case 0: 
+    //     // error code flag : (W/R=0, P=0): read, not present
+    //     if (!(vma->vm_flags & (VM_READ | VM_EXEC))) {
+    //         printf("do_pgfault failed: error code flag = read AND not present, but the addr's vma cannot read or exec\n");
+    //         // goto failed;
+    //         return ret;
+    //     }
+    // }
+
     /* IF (write an existed addr ) OR
      *    (write an non_existed addr && addr is writable) OR
      *    (read  an non_existed addr && addr is readable)
@@ -467,35 +445,36 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
    //  #endif
     // try to find a pte, if pte's PT(Page Table) isn't existed, then create a PT.
     // (notice the 3th parameter '1')
+
     if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
         printf("get_pte in do_pgfault failed\n");
-        // goto failed;
         return ret;
     }
     
     if (*ptep == 0) { // if the phy addr isn't exist, then alloc a page & map the phy addr with logical addr
-        // if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
-        //     printf("pgdir_alloc_page in do_pgfault failed\n");
-        //     // goto failed;
-        //     return ret;
-        // }
+        if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
+            printf("pgdir_alloc_page in do_pgfault failed\n");
+            return ret;
+        }
     }
     else { // if this pte is a swap entry, then load data from disk to a page with phy addr
            // and call page_insert to map the phy addr with logical addr
         if(swap_init_ok) {
             page=NULL;
-            // if ((ret = swap_in(mm, addr, &page)) != 0) {
-            //     printf("swap_in in do_pgfault failed\n");
-            //     // goto failed;
-            //     return ret;
-            // }    
+            if ((ret = swap_in(mm, addr, &page)) != 0) {
+                printf("swap_in in do_pgfault failed\n");
+                return ret;
+            }
+            spage(1);
             page_insert(mm->pgdir, page, addr, perm);
-            // swap_map_swappable(mm, addr, page, 1);
-            // page->pra_vaddr = addr;
+            swap_map_swappable(mm, addr, page, 1);
+            page->pra_vaddr = addr;
+            printf("address%x\n", addr);
+            printf("%x %x\n", *get_pte(boot_pgdir, addr, 0), addr);
+            printf("%x\n", *(char*)(addr));
         }
         else {
             printf("no swap_init_ok but ptep is %x, failed\n",*ptep);
-            // goto failed;
             return ret;
         }
    }

@@ -149,7 +149,6 @@ page_ref_dec(struct Page *page) {
 pte_t *  vpt = (pte_t *)(VPT);
 pde_t *  vpd = (pde_t *)PGADDR(PDX(VPT), PDX(VPT), 0);
 
-
 // pmm_manager is a physical memory management class. A special pmm manager - XXX_pmm_manager
 // only needs to implement the methods in pmm_manager class, then XXX_pmm_manager can be used
 // by ucore to manage the total physical memory space.
@@ -183,17 +182,61 @@ init_memmap(struct Page *base, size_t n) {
     call2(base, n, pmm_manager->init_memmap);
 }
 
+struct mm_struct;
+
+// the virtual continuous memory area(vma)
+struct vma_struct {
+    struct mm_struct *vm_mm;        // the set of vma using the same PDT
+    uintptr_t vm_start;             //    start addr of vma
+    uintptr_t vm_end;               // end addr of vma
+    uint32_t vm_flags;              // flags of vma
+    list_entry_t list_link;         // linear list link which sorted by start addr of vma
+};
+
+// the control struct for a set of vma using the same PDT
+struct mm_struct {
+    list_entry_t mmap_list;         // linear list link which sorted by start addr of vma
+    struct vma_struct *mmap_cache;  // current accessed vma, used for speed purpose
+    pde_t *pgdir;                   // the PDT of these vma
+    int map_count;                  // the count of these vma
+    void *sm_priv;                  // the private data for swap manager
+};
+
+int swap_init_ok = 0;
+
+struct mm_struct *check_mm_struct;
+
+int swap_out(struct mm_struct *mm, int n, int in_tick);
+
 //alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE memory
 struct Page *
 alloc_pages(size_t n) {
+
     struct Page *page=NULL;
     bool intr_flag;
-    local_intr_save(intr_flag);
+    
+    while (1)
     {
-        page = call1(n, pmm_manager->alloc_pages);
+         local_intr_save(intr_flag);
+         {
+            page = call1(n, pmm_manager->alloc_pages);
+         }
+         local_intr_restore(intr_flag);
+
+         if (page != NULL || n > 1 || swap_init_ok == 0) break;
+         
+         swap_out(check_mm_struct, n, 0);
     }
-    local_intr_restore(intr_flag);
     return page;
+
+    // struct Page *page=NULL;
+    // bool intr_flag;
+    // local_intr_save(intr_flag);
+    // {
+    //     page = call1(n, pmm_manager->alloc_pages);
+    // }
+    // local_intr_restore(intr_flag);
+    // return page;
 }
 
 //free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
@@ -341,6 +384,15 @@ struct Page* get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
     return NULL;
 }
 
+tlb_clear_enable = 0;
+
+// invalidate a TLB entry, but only if the page tables being
+// edited are the ones currently in use by the processor.
+void tlb_invalidate(pde_t *pgdir, uintptr_t la) {
+    if (tlb_clear_enable)
+        spage(1);
+}
+
 /*
 page_remove_pte - free an Page sturct which is related linear address la
                - and clean(invalidate) pte which is related linear address la
@@ -379,6 +431,7 @@ void page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
             free_page(page);
         }
         *ptep = 0;
+        tlb_invalidate(pgdir, la);
     }
 }
 
@@ -420,7 +473,33 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
         }
     }
     *ptep = page2pa(page) | PTE_P | perm;
+
+    tlb_invalidate(pgdir, la);
     return 0;
+}
+
+
+int swap_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in);
+// pgdir_alloc_page - call alloc_page & page_insert functions to 
+//                  - allocate a page size memory & setup an addr map
+//                  - pa<->la with linear address la and the PDT pgdir
+struct Page *
+pgdir_alloc_page(pde_t *pgdir, uintptr_t la, uint32_t perm) {
+    struct Page *page = alloc_page();
+    if (page != NULL) {
+        if (page_insert(pgdir, page, la, perm) != 0) {
+            free_page(page);
+            return NULL;
+        }
+        if (swap_init_ok){
+            swap_map_swappable(check_mm_struct, la, page, 0);
+            page->pra_vaddr=la;
+            assert(page_ref(page) == 1);
+        }
+
+    }
+
+    return page;
 }
 
 void check_alloc_page(void) {
@@ -611,6 +690,7 @@ void print_pgdir(void) {
 void check_and_return() {
     list_entry_t *head = &free_area.free_list;
 
+    // int i;
     //reload gdt(third time,the last time) to map all physical memory
     //virtual_addr 0~4G=liear_addr 0~4G
     //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS  
@@ -618,7 +698,7 @@ void check_and_return() {
 
     //disable the map of virtual_addr 0~4M
     boot_pgdir[0] = 0;
-    
+        
     load_default_pmm_manager();
     pmm_manager = &default_pmm_manager;
     
@@ -698,7 +778,29 @@ pmm_init() {
     ksp = (uint)(check_and_return) + KERNBASE;
     asm(LL, 4);
     asm(JSRA);
+}
 
+
+void *
+kmalloc(size_t n) {
+    void * ptr=NULL;
+    struct Page *base=NULL;
+    int num_pages=(n+PGSIZE-1)/PGSIZE;
+    assert(n > 0 && n < 1024*0124);
+    base = alloc_pages(num_pages);
+    assert(base != NULL);
+    ptr=page2kva(base);
+    return ptr;
+}
+
+void 
+kfree(void *ptr, size_t n) {
+    struct Page *base=NULL;
+    int num_pages=(n+PGSIZE-1)/PGSIZE;
+    assert(n > 0 && n < 1024*0124);
+    assert(ptr != NULL);
+    base = kva2page(ptr);
+    free_pages(base, num_pages);
 }
 
 #endif /* !__KERN_MM_PMM_H__ */

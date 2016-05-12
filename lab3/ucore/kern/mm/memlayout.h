@@ -52,6 +52,7 @@
 
 typedef uintptr_t pte_t;
 typedef uintptr_t pde_t;
+typedef pte_t swap_entry_t;
 
 /* *
  * struct Page - Page descriptor structures. Each Page describes one
