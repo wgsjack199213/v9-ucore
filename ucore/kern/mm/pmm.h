@@ -22,31 +22,6 @@ uintptr_t boot_cr3;
 // virtual address of end of bss
 uint endbss;
 uint page_enable;
-// /* *
-//  * PADDR - takes a kernel virtual address (an address that points above KERNBASE),
-//  * where the machine's maximum 256MB of physical memory is mapped and returns the
-//  * corresponding physical address.  It panics if you pass it a non-kernel virtual address.
-//  * */
-// #define PADDR(kva) ({                                                   \
-//             uintptr_t __m_kva = (uintptr_t)(kva);                       \
-//             if (__m_kva < KERNBASE) {                                   \
-//                 panic("PADDR called with invalid kva %08lx", __m_kva);  \
-//             }                                                           \
-//             __m_kva - KERNBASE;                                         \
-//         })
-
-// /* *
-//  * KADDR - takes a physical address and returns the corresponding kernel virtual
-//  * address. It panics if you pass an invalid physical address.
-//  * */
-// #define KADDR(pa) ({                                                    \
-//             uintptr_t __m_pa = (pa);                                    \
-//             size_t __m_ppn = PPN(__m_pa);                               \
-//             if (__m_ppn >= npage) {                                     \
-//                 panic("KADDR called with invalid pa %08lx", __m_pa);    \
-//             }                                                           \
-//             (void *) (__m_pa + KERNBASE);                               \
-//         })
 
 /* *
  * PADDR - takes a kernel virtual address (an address that points above KERNBASE),
@@ -56,9 +31,6 @@ uint page_enable;
 uint PADDR(uint kva) {
     uint __m_kva;
     __m_kva = kva;
-    // if (__m_kva < KERNBASE) {
-    //     panic("PADDR called with invalid kva %x\n", __m_kva);
-    // }
     if (page_enable == 1)
         return __m_kva - KERNBASE;
     else
@@ -74,9 +46,6 @@ uint KADDR(uint pa) {
     uint __m_ppn;
     __m_pa = pa;
     __m_ppn = PPN(__m_pa);
-    // if (__m_ppn >= npage) {
-    //             panic("KADDR called with invalid pa %x", __m_pa);
-    // }
     if (page_enable == 1)
         return __m_pa + KERNBASE;
     else
@@ -200,6 +169,8 @@ struct mm_struct {
     pde_t *pgdir;                   // the PDT of these vma
     int map_count;                  // the count of these vma
     void *sm_priv;                  // the private data for swap manager
+    int mm_count;
+    lock_t mm_lock;
 };
 
 int swap_init_ok = 0;
@@ -229,14 +200,6 @@ alloc_pages(size_t n) {
     }
     return page;
 
-    // struct Page *page=NULL;
-    // bool intr_flag;
-    // local_intr_save(intr_flag);
-    // {
-    //     page = call1(n, pmm_manager->alloc_pages);
-    // }
-    // local_intr_restore(intr_flag);
-    // return page;
 }
 
 //free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
@@ -485,16 +448,40 @@ int swap_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, 
 //                  - pa<->la with linear address la and the PDT pgdir
 struct Page *
 pgdir_alloc_page(pde_t *pgdir, uintptr_t la, uint32_t perm) {
+    // struct Page *page = alloc_page();
+    // if (page != NULL) {
+    //     if (page_insert(pgdir, page, la, perm) != 0) {
+    //         free_page(page);
+    //         return NULL;
+    //     }
+    //     if (swap_init_ok){
+    //         swap_map_swappable(check_mm_struct, la, page, 0);
+    //         page->pra_vaddr=la;
+    //         assert(page_ref(page) == 1);
+    //     }
+
+    // }
+
     struct Page *page = alloc_page();
+
     if (page != NULL) {
         if (page_insert(pgdir, page, la, perm) != 0) {
             free_page(page);
             return NULL;
         }
         if (swap_init_ok){
-            swap_map_swappable(check_mm_struct, la, page, 0);
-            page->pra_vaddr=la;
-            assert(page_ref(page) == 1);
+            if(check_mm_struct!=NULL) {
+                swap_map_swappable(check_mm_struct, la, page, 0);
+                page->pra_vaddr=la;
+                assert(page_ref(page) == 1);
+                //cprintf("get No. %d  page: pra_vaddr %x, pra_link.prev %x, pra_link_next %x in pgdir_alloc_page\n", (page-pages), page->pra_vaddr,page->pra_page_link.prev, page->pra_page_link.next);
+            }
+            else  {  //now current is existed, should fix it in the future
+                //swap_map_swappable(current->mm, la, page, 0);
+                //page->pra_vaddr=la;
+                //assert(page_ref(page) == 1);
+                //panic("pgdir_alloc_page: no pages. now current is existed, should fix it in the future\n");
+            }
         }
 
     }
@@ -687,6 +674,8 @@ void print_pgdir(void) {
     printf("--------------------- END ---------------------\n");
 }
 
+void kmalloc_init();
+
 void check_and_return() {
     list_entry_t *head = &free_area.free_list;
 
@@ -712,6 +701,8 @@ void check_and_return() {
     
     check_boot_pgdir();
     print_pgdir();
+
+    kmalloc_init();
 }
 
 uint getsp() {
@@ -780,27 +771,110 @@ pmm_init() {
     asm(JSRA);
 }
 
+void
+unmap_range(pde_t *pgdir, uintptr_t start, uintptr_t end) {
 
-void *
-kmalloc(size_t n) {
-    void * ptr=NULL;
-    struct Page *base=NULL;
-    int num_pages=(n+PGSIZE-1)/PGSIZE;
-    assert(n > 0 && n < 1024*0124);
-    base = alloc_pages(num_pages);
-    assert(base != NULL);
-    ptr=page2kva(base);
-    return ptr;
+    pte_t *ptep;
+
+    assert(start % PGSIZE == 0 && end % PGSIZE == 0);
+    assert(USER_ACCESS(start, end));
+
+    do {
+        ptep = get_pte(pgdir, start, 0);
+        if (ptep == NULL) {
+            start = ROUNDDOWN(start + PTSIZE, PTSIZE);
+            continue ;
+        }
+        if (*ptep != 0) {
+            page_remove_pte(pgdir, start, ptep);
+        }
+        start += PGSIZE;
+    } while (start != 0 && start < end);
 }
 
-void 
-kfree(void *ptr, size_t n) {
-    struct Page *base=NULL;
-    int num_pages=(n+PGSIZE-1)/PGSIZE;
-    assert(n > 0 && n < 1024*0124);
-    assert(ptr != NULL);
-    base = kva2page(ptr);
-    free_pages(base, num_pages);
+void
+exit_range(pde_t *pgdir, uintptr_t start, uintptr_t end) {
+
+    int pde_idx;
+
+    assert(start % PGSIZE == 0 && end % PGSIZE == 0);
+    assert(USER_ACCESS(start, end));
+
+    start = ROUNDDOWN(start, PTSIZE);
+    do {
+        pde_idx = PDX(start);
+        if (pgdir[pde_idx] & PTE_P) {
+            free_page(pde2page(pgdir[pde_idx]));
+            pgdir[pde_idx] = 0;
+        }
+        start += PTSIZE;
+    } while (start != 0 && start < end);
+}
+/* copy_range - copy content of memory (start, end) of one process A to another process B
+ * @to:    the addr of process B's Page Directory
+ * @from:  the addr of process A's Page Directory
+ * @share: flags to indicate to dup OR share. We just use dup method, so it didn't be used.
+ *
+ * CALL GRAPH: copy_mm-->dup_mmap-->copy_range
+ */
+int
+copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end, bool share) {
+    pte_t *ptep, *nptep;
+    uint32_t perm;
+    struct Page *page;
+    struct Page *npage;
+    int ret;
+    void * kva_src;
+    void * kva_dst;
+
+    assert(start % PGSIZE == 0 && end % PGSIZE == 0);
+    assert(USER_ACCESS(start, end));
+    // copy content by page unit.
+    do {
+        //call get_pte to find process A's pte according to the addr start
+        ptep = get_pte(from, start, 0);
+        if (ptep == NULL) {
+            start = ROUNDDOWN(start + PTSIZE, PTSIZE);
+            continue ;
+        }
+        //call get_pte to find process B's pte according to the addr start. If pte is NULL, just alloc a PT
+        if (*ptep & PTE_P) {
+            if ((nptep = get_pte(to, start, 1)) == NULL) {
+                return -E_NO_MEM;
+            }
+        perm = (*ptep & PTE_USER);
+        //get page from ptep
+        page = pte2page(*ptep);
+        // alloc a page for process B
+        npage = alloc_page();
+        assert(page!=NULL);
+        assert(npage!=NULL);
+        ret=0;
+        /* LAB5:EXERCISE2 YOUR CODE
+         * replicate content of page to npage, build the map of phy addr of nage with the linear addr start
+         *
+         * Some Useful MACROs and DEFINEs, you can use them in below implementation.
+         * MACROs or Functions:
+         *    page2kva(struct Page *page): return the kernel vritual addr of memory which page managed (SEE pmm.h)
+         *    page_insert: build the map of phy addr of an Page with the linear addr la
+         *    memcpy: typical memory copy function
+         *
+         * (1) find src_kvaddr: the kernel virtual address of page
+         * (2) find dst_kvaddr: the kernel virtual address of npage
+         * (3) memory copy from src_kvaddr to dst_kvaddr, size is PGSIZE
+         * (4) build the map of phy addr of  nage with the linear addr start
+         */
+        kva_src = page2kva(page);
+        kva_dst = page2kva(npage);
+
+        memcpy(kva_dst, kva_src, PGSIZE);
+
+        ret = page_insert(to, npage, start, perm);
+        assert(ret == 0);
+        }
+        start += PGSIZE;
+    } while (start != 0 && start < end);
+    return 0;
 }
 
 #endif /* !__KERN_MM_PMM_H__ */

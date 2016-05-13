@@ -310,7 +310,14 @@ void check_swap(void)
          free_pages(check_rp[i],1);
      }
 
+     //free_page(pte2page(*temp_ptep));
+     free_page(pde2page(pgdir[0]));
+     pgdir[0] = 0;
+     mm->pgdir = NULL;
+     
      mm_destroy(mm);
+     
+     check_mm_struct = NULL;
 
      nr_free = nr_free_store;
      memcpy(&free_list, &free_list_store, sizeof(struct list_entry));
