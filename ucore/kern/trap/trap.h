@@ -1,21 +1,8 @@
 #ifndef __KERN_TRAP_TRAP_H__
 #define __KERN_TRAP_TRAP_H__
 #include <defs.h>
-
-struct pushregs {
-    int sp, pad1;
-    double g;
-    double f;
-    int c,  pad2;
-    int b,  pad3;
-    int a,  pad4;
-};
-
-struct trapframe {
-    struct pushregs tf_regs;
-    int fc, pad5;
-    int pc, pad6;
-};
+#include <syscall.h>
+#include <tfstruct.h>
 
 enum {    // processor fault codes
     FMEM,   // bad physical address
@@ -87,29 +74,6 @@ uint trap_in_kernel(struct trapframe *tf) {
     return 1;
 }
 
-void print_regs(struct pushregs *regs) {
-    printf("  SP : 0x%x\n", regs -> sp);
-    // printf("  REG_G : %f\n", regs -> g);
-    // printf("  REG_F : %f\n", regs -> f);
-    printf("  REG_A : 0x%x\n", regs -> a);
-    printf("  REG_B : 0x%x\n", regs -> b);
-    printf("  REG_C : 0x%x\n", regs -> c);
-}
-
-void print_trapframe(struct trapframe *tf) {
-    // printf("trapframe at %x\n", tf);
-    // print_regs(&tf->tf_regs);
-    // if (!trap_in_kernel(tf)) {
-    //   printf("Trap in usermode!\n");
-    // }else{
-    //   printf("Trap in kernel!\n");
-    // }
-    // printf("Error Code: %e\n", tf->fc);
-    printf("PC : 0x%x\n", tf->pc);
-    printf("\n");
-}
-
-
 void print_pgfault(struct trapframe *tf) {
     /* error_code:
      * bit 0 == 0 means no page found, 1 means protection fault
@@ -121,8 +85,6 @@ void print_pgfault(struct trapframe *tf) {
             (tf->fc == FWPAGE || tf->fc == USER + FWPAGE) ? 'W' : 'R',
             (tf->tf_regs.b & 1) ? "protection fault" : "no page found");
 }
-
-int do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr);
 
 int pgfault_handler(struct trapframe *tf) {
     print_pgfault(tf);
@@ -141,6 +103,7 @@ void trap_dispatch(struct trapframe *tf)
   switch (tf -> fc) {
     case FSYS: panic("FSYS from kernel");
     case FSYS + USER:
+      tf->tf_regs.a = syscall(tf);
       return;
     case FMEM:
       panic("FMEM from kernel");

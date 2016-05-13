@@ -26,6 +26,12 @@ static void cputch(int c, int *cnt, int unused) {
     (*cnt) ++;
 }
 
+/* cputchar - writes a single character to stdout */
+void
+cputchar(int c) {
+    cout(c);
+}
+
 static int
 vkprintf(char *fmt, va_list ap) {
     int cnt = 0;

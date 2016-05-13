@@ -26,13 +26,24 @@ enum {
   IDLE
 };
 
-// system calls
-enum {
-  S_fork=1, S_exit,   S_wait,   S_pipe,   S_write,  S_read,   S_close,  S_kill,
-  S_exec,   S_open,   S_mknod,  S_unlink, S_fstat,  S_link,   S_mkdir,  S_chdir,
-  S_dup2,   S_getpid, S_sbrk,   S_sleep,  S_uptime, S_lseek,  S_mount,  S_umount,
-  S_socket, S_bind,   S_listen, S_poll,   S_accept, S_connect, 
-};
+/* syscall number */
+#define SYS_exit            1
+#define SYS_fork            2
+#define SYS_wait            3
+#define SYS_exec            4
+#define SYS_clone           5
+#define SYS_yield           10
+#define SYS_sleep           11
+#define SYS_kill            12
+#define SYS_gettime         17
+#define SYS_getpid          18
+#define SYS_brk             19
+#define SYS_mmap            20
+#define SYS_munmap          21
+#define SYS_shmem           22
+#define SYS_putc            30
+#define SYS_pgdir           31
+
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
