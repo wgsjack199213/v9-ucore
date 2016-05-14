@@ -11,6 +11,8 @@
 #include <pstruct.h>
 #include <vmm.h>
 
+int syscall(struct trapframe *tf);
+
 // alloc_proc - alloc a proc_struct and init all fields of proc_struct
 static struct proc_struct *
 alloc_proc(void) {
@@ -592,16 +594,37 @@ do_kill(int pid) {
 }
 
 
+static int
+__kernel_execve(funcptr_t syscall, char *name, uint* args) {
+    asm(LI, SYS_exec);
+    asm(LBL, 16);
+    asm(LCL, 8);
+    asm(LEV);
+}
+
 // kernel_execve - do SYS_exec syscall to exec a user program called by user_main kernel_thread
 static int
-kernel_execve(const char *name, unsigned char *binary, size_t size) {
-    panic("kernel_execve not implement.");
+kernel_execve(char *name, unsigned char *binary, size_t size) {
+    // panic("kernel_execve not implement.");
+    uint args[3];
+    args[0] = strlen(name);
+    args[1] = binary;
+    args[2] = size;
+    return __kernel_execve(syscall, name, args);
+}
+
+static int exitfunc() {
+
+}
+
+static int exitend() {
+
 }
 
 // user_main - kernel thread used to exec a user program
 static int
 user_main(void *arg) {
-    //TODO
+    kernel_execve("exit", exitfunc, (uint)exitend - (uint)exitfunc);
     panic("user_main execve failed.\n");
 }
 
@@ -612,16 +635,13 @@ init_main(void *arg) {
     size_t nr_free_pages_store = nr_free_pages();
     size_t kernel_allocated_store = kallocated();
 
-    // int pid = kernel_thread(user_main, NULL, 0);
-    // if (pid <= 0) {
-    //     panic("create user_main failed.\n");
-    // }
-    //
-    // while (do_wait(0, NULL) == 0) {
-    //     schedule();
-    // }
-    while(1) {
+    int pid = kernel_thread(user_main, NULL, 0);
+    if (pid <= 0) {
+        panic("create user_main failed.\n");
+    }
 
+    while (do_wait(0, NULL) == 0) {
+        schedule();
     }
 
     printf("all user-mode processes have quit.\n");
