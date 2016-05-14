@@ -29,10 +29,13 @@ try_lock(lock_t *lock) {
     return !test_and_set_bit(0, lock);
 }
 
+void schedule(void);
+
 void
 lock(lock_t *lock) {
     while (!try_lock(lock)) {
-        // schedule(); to do
+        schedule(); 
+        //to do
     }
 }
 

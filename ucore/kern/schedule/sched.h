@@ -5,7 +5,6 @@
 #include <io.h>
 #include <sync.h>
 
-void schedule(void);
 void wakeup_proc(struct proc_struct *proc);
 
 void

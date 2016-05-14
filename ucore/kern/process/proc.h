@@ -83,7 +83,9 @@ void proc_run(struct proc_struct *proc) {
         local_intr_save(intr_flag);
         {
             current = proc;
-            // load_esp0(next->kstack + KSTACKSIZE);
+            // load_esp0(next->kstack + KSTACKSIZE);    ???
+            pdir(next->cr3);
+            spage(1);
             switch_to(&(prev->context), &(next->context));
         }
         local_intr_restore(intr_flag);
@@ -94,7 +96,7 @@ void proc_run(struct proc_struct *proc) {
 // NOTE: the addr of forkret is setted in copy_thread function
 //       after switch_to, the current proc will execute here.
 void
-forkret(void) {
+forkret(void) {     //???
     asm(POPA); asm(SUSP);
     asm(POPG);
     asm(POPF);
@@ -109,7 +111,7 @@ void kernel_thread_entry() {
     asm(PSHC); // push arg
     asm(PSHB); // push return addr
     asm(LEV);  // jump to function
-    asm(PSHA);
+    asm(PSHA);  //???
     do_exit();
 }
 
@@ -281,11 +283,11 @@ copy_mm(uint32_t clone_flags, struct proc_struct *proc) {
         goto bad_pgdir_cleanup_mm;
     }
 
-    // lock_mm(oldmm); //TODO lock_mm
-    // {
-    //     ret = dup_mmap(mm, oldmm);
-    // }
-    // unlock_mm(oldmm);
+    lock_mm(oldmm);
+    {
+        ret = dup_mmap(mm, oldmm);
+    }
+    unlock_mm(oldmm);
 
     if (ret != 0) {
         goto bad_dup_cleanup_mmap;
@@ -462,7 +464,7 @@ do_exit(int error_code) {
  */
 static int
 load_icode(unsigned char *binary, size_t size) {
-    panic("load_icode not implement.");
+    panic("load_icode not implement."); //???
 }
 
 
@@ -595,13 +597,13 @@ do_kill(int pid) {
 // kernel_execve - do SYS_exec syscall to exec a user program called by user_main kernel_thread
 static int
 kernel_execve(const char *name, unsigned char *binary, size_t size) {
-    panic("kernel_execve not implement.");
+    panic("kernel_execve not implement.");  //??
 }
 
 // user_main - kernel thread used to exec a user program
 static int
 user_main(void *arg) {
-    //TODO
+    //TODO  ??
     panic("user_main execve failed.\n");
 }
 
@@ -612,7 +614,7 @@ init_main(void *arg) {
     size_t nr_free_pages_store = nr_free_pages();
     size_t kernel_allocated_store = kallocated();
 
-    // int pid = kernel_thread(user_main, NULL, 0);
+    // int pid = kernel_thread(user_main, NULL, 0); //???
     // if (pid <= 0) {
     //     panic("create user_main failed.\n");
     // }
@@ -663,11 +665,14 @@ proc_init(void) {
     current = idleproc;
 
     pid = kernel_thread(init_main, NULL, 0);
+    printf("%d\n", pid);
+    
     if (pid <= 0) {
         panic("create init_main failed.\n");
     }
-
+    
     initproc = find_proc(pid);
+
     set_proc_name(initproc, "init");
 
     assert(idleproc != NULL && idleproc->pid == 0);
