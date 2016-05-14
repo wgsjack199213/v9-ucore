@@ -2109,7 +2109,6 @@ trap(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc)
   case FWPAGE + USER:
   case FRPAGE:        // XXX
   case FRPAGE + USER: // XXX
-
     if ((va = lvadr()) >= u->sz) exit(-1);
     pc--; // printf("fault"); // restart instruction
     mappage(u->pdir, va & -PAGE, V2P+(memset(kalloc(), 0, PAGE)), PTE_P | PTE_W | PTE_U);
@@ -2159,24 +2158,14 @@ alltraps()
 mainc()
 {
   kpdir[0] = 0;          // don't need low map anymore
-  spage(1);
-
-
   consoleinit();         // console device
   ivec(alltraps);        // trap vector
   binit();               // buffer cache
   ideinit();             // disk
-  printf("gg\n");
   stmr(128*1024);        // set timer
   userinit();            // first user process
   printf("Welcome!\n");
-
-  // *(uint*)(0x0001000) = 1;
-  printf("%x\n", *(uint*)(0x0001000));
-
-
   scheduler();           // start running processes
-
 }
 
 main()
