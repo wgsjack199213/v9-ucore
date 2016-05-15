@@ -41,7 +41,7 @@ alloc_proc(void) {
         proc->need_resched = 0;
         proc->parent = NULL;
         proc->mm = NULL;
-        proc->context = 0;
+        memset(&(proc->context), 0, sizeof(struct context));
         proc->tf = NULL;
         proc->cr3 = boot_cr3;
         proc->flags = 0;
@@ -67,13 +67,65 @@ get_proc_name(struct proc_struct *proc) {
     return memcpy(name, proc->name, PROC_NAME_LEN);
 }
 
-void switch_to(int *oldc, int newc) // switch stacks
+uint getb() {
+    asm(PSHB);
+    asm(POPA);
+}
+
+uint getc() {
+    asm(PSHC);
+    asm(POPA);
+}
+
+void setb(int con) {
+    asm(LL, 8);
+    asm(LBA);
+}
+
+void setc(int con) {
+    asm(LL, 8);
+    asm(LCA);
+}
+
+void seta(int con) {
+    asm(LL, 8);
+}
+
+void kernel_thread_entry() {
+    asm(PSHC); // push arg
+    asm(PSHB); // push return addr
+    asm(LEV);  // jump to function
+    asm(PSHA);  //???
+    do_exit();
+}
+// forkret -- the first kernel entry point of a new thread/process
+// NOTE: the addr of forkret is setted in copy_thread function
+//       after switch_to, the current proc will execute here.
+void
+forkret(void) {
+    asm(POPA); asm(SUSP);
+    asm(POPG);
+    asm(POPF);
+    asm(POPC);
+    asm(POPB);
+    asm(POPA);
+    asm(RTI);
+}
+
+
+void switch_to(struct context *oldc, struct context *newc) // switch stacks
 {
-  asm(LEA,0); // a = sp
-  asm(LBL,8); // b = old
-  asm(SX,0);  // *b = a
-  asm(LL,16); // a = new
-  asm(SSP);   // sp = a
+    oldc->pc = *(uint*)(getsp());
+    oldc->sp = getsp();
+    oldc->b = getb();
+    oldc->c = getc();
+
+    setb(newc->b);
+    setc(newc->c);
+    *(uint*)((uint)(newc->sp) - 8) = newc->pc;
+    seta((uint)(newc->sp) - 8);
+    asm(SSP);
+    asm(LEV);
 }
 
 void proc_run(struct proc_struct *proc) {
@@ -85,36 +137,12 @@ void proc_run(struct proc_struct *proc) {
         local_intr_save(intr_flag);
         {
             current = proc;
-            // load_esp0(next->kstack + KSTACKSIZE);    ???
             pdir(next->cr3);
             spage(1);
             switch_to(&(prev->context), &(next->context));
         }
         local_intr_restore(intr_flag);
     }
-}
-
-// forkret -- the first kernel entry point of a new thread/process
-// NOTE: the addr of forkret is setted in copy_thread function
-//       after switch_to, the current proc will execute here.
-void
-forkret(void) {     //???
-    asm(POPA); asm(SUSP);
-    asm(POPG);
-    asm(POPF);
-    asm(POPC);
-    asm(POPB);
-    asm(POPA);
-    asm(RTI);
-}
-
-
-void kernel_thread_entry() {
-    asm(PSHC); // push arg
-    asm(PSHB); // push return addr
-    asm(LEV);  // jump to function
-    asm(PSHA);  //???
-    do_exit();
 }
 
 // set_links - set the relation links of process
@@ -313,15 +341,14 @@ bad_mm:
 //             - setup the kernel entry point and stack of process
 static void
 copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
-    // uintptr_t sp;
-    // proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
-    // memcpy(proc->tf, tf, sizeof(struct trapframe));
-    // proc->tf->tf_regs.a = 0;
-    // proc->tf->tf_regs.sp = esp;
-    //
-    // sp = (uintptr_t)proc->tf - 8;
-    // *sp = forkret;
-    // proc->context = sp;
+
+    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
+    memcpy(proc->tf, tf, sizeof(struct trapframe));
+    proc->tf->tf_regs.a = 0;
+    proc->tf->tf_regs.sp = esp;
+
+    proc->context.pc = (uintptr_t)(forkret);
+    proc->context.sp = (uintptr_t)(proc->tf);
 }
 
 /* do_fork -     parent process for a new child process
@@ -391,6 +418,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     wakeup_proc(proc);
 
     ret = proc->pid;
+
 fork_out:
     return ret;
 
@@ -420,6 +448,8 @@ do_exit(int error_code) {
 
     mm = current->mm;
     if (mm != NULL) {
+        pdir(boot_cr3);
+        spage(1);
         if (mm_count_dec(mm) == 0) {
             exit_mmap(mm);
             put_pgdir(mm);
@@ -488,6 +518,8 @@ do_execve(const char *name, size_t len, unsigned char *binary, size_t size) {
     memcpy(local_name, name, len);
 
     if (mm != NULL) {
+        pdir(boot_cr3);
+        spage(1);
         if (mm_count_dec(mm) == 0) {
             exit_mmap(mm);
             put_pgdir(mm);
@@ -636,9 +668,16 @@ init_main(void *arg) {
     size_t nr_free_pages_store = nr_free_pages();
     size_t kernel_allocated_store = kallocated();
 
-    int pid = kernel_thread(user_main, NULL, 0);
+    int pid;
+
+    pid = kernel_thread(user_main, NULL, 0);
+
     if (pid <= 0) {
         panic("create user_main failed.\n");
+    }
+
+    while (do_wait(0, NULL) == 0) {
+        schedule();
     }
 
     printf("all user-mode processes have quit.\n");
@@ -678,16 +717,13 @@ proc_init(void) {
     nr_process ++;
 
     current = idleproc;
-
     pid = kernel_thread(init_main, NULL, 0);
-    printf("%d\n", pid);
     
     if (pid <= 0) {
         panic("create init_main failed.\n");
     }
     
     initproc = find_proc(pid);
-
     set_proc_name(initproc, "init");
 
     assert(idleproc != NULL && idleproc->pid == 0);

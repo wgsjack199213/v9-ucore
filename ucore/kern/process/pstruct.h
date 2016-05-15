@@ -21,6 +21,13 @@ enum proc_state {
 #define MAX_PROCESS                 4096
 #define MAX_PID                     (MAX_PROCESS * 2)
 
+struct context {
+    uint32_t pc;
+    uint32_t sp;
+    uint32_t b;
+    uint32_t c;
+};
+
 struct proc_struct {
     enum proc_state state;                      // Process state
     int pid;                                    // Process ID
@@ -29,7 +36,7 @@ struct proc_struct {
     bool need_resched;                          // bool value: need to be rescheduled to release CPU?
     struct proc_struct *parent;                 // the parent process
     struct mm_struct *mm;                       // Process's memory management field
-    int context;                                // Switch here to run process, save sp
+    struct context context;                                // Switch here to run process, save sp
     struct trapframe *tf;                       // Trap frame for current interrupt
     uintptr_t cr3;                              // CR3 register: the base addr of Page Directroy Table(PDT)
     uint32_t flags;                             // Process flag
