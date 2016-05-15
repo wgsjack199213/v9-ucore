@@ -1,9 +1,9 @@
 #!/bin/sh
-rm -f xc xem xmkfs root/bin/c root/etc/os fs.img
+bash cleanup.sh
 gcc -o xc -O3 -m32 -Ilinux -Iroot/lib root/bin/c.c
 gcc -o xem -O3 -m32 -Ilinux -Iroot/lib root/bin/em.c -lm
 gcc -o xmkfs -O3 -m32 -Ilinux -Iroot/lib root/bin/mkfs.c
 ./xc -o root/bin/c -Iroot/lib root/bin/c.c
-./xc -o root/etc/os -Iroot/lib root/etc/os.c
+./xc -o os.bin -Iroot/lib root/kern/os.c
 ./xmkfs fs.img root
-./xem -f fs.img root/etc/os
+./xem -f fs.img os.bin

@@ -1845,11 +1845,12 @@ found:
 // hand-craft the first process
 init_start()
 {
-  char cmd[10], *argv[2];
+  char cmd[12], *argv[2];
   
   // no data/bss segment
-  cmd[0] = '/'; cmd[1] = 'e'; cmd[2] = 't'; cmd[3] = 'c'; cmd[4] = '/';
-  cmd[5] = 'i'; cmd[6] = 'n'; cmd[7] = 'i'; cmd[8] = 't'; cmd[9] = 0;
+  cmd[0] = '/'; cmd[1] = 'k'; cmd[2] = 'e'; cmd[3] = 'r'; cmd[4] = 'n';
+  cmd[5] = '/'; cmd[6] = 'i'; cmd[7] = 'n'; cmd[8] = 'i'; cmd[9] = 't';
+  cmd[10] = 0;
   
   argv[0] = cmd;
   argv[1] = 0;
