@@ -7,39 +7,38 @@
 #include <sync.h>
 #include <default_pmm.h>
 #include <trap.h>
-// #include <fs.h>
-// #include <swap_fifo.h>
 #include <swap.h>
+#include <skew_heap.h>
+#include <kmalloc.h>
+#include <proc.h>
 
 void kern_init() {
-    // extern char edata[], end[];
-
-    // memset(edata, 0,
-    //  - edata);
 
     // cons_init();                // init the console
 
-    printf("(THU.CST) os is loading ...\n");
-
+    // printf("(THU.CST) os is loading ...\n");
+    printf("%x\n", kern_init);
     pmm_init();                 // init physical memory management
 
     idt_init();                 // init interrupt descriptor table
 
     asm(STI);                   // enable irq interrupt
-    
-    tlb_clear_enable = 1;
-    
+
     spage(1);
 
     vmm_init();                 // init virtual memory management
 
     swap_init();                // init swap
 
+    proc_init();
+
     stmr(128*1024*1000);        // init clock interrupt
 
-    while (1) {
-                                // do nothing
-    }
+    cpu_idle();
+
+    // while (1) {
+    //                             // do nothing
+    // }
 }
 
 main() {
