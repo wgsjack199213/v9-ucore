@@ -2,20 +2,30 @@
 #define __LIBS_ATOMIC_H__
 
 set_bit(int nr, uint* addr) {
+    int e = splhi();
     *addr = (*addr) | (1 << nr);
+    splx(e);
 }
 
 clear_bit(int nr, uint* addr) {
+    int e = splhi();
     *addr = ((*addr) | (1 << nr)) ^ (1 << nr);
+    splx(e);
 }
 
 change_bit(int nr, uint* addr) {
+    int e = splhi();
     *addr = (*addr) ^ (1 << nr);
+    splx(e);
 }
 
 int test_bit(int nr, uint* addr) {
-    if (((*addr) & (1 << nr)) == 0)
+    int e = splhi();
+    if (((*addr) & (1 << nr)) == 0) {
+        splx(e);
         return 0;
+    }
+    splx(e);
     return 1;
 }
 
@@ -26,8 +36,10 @@ int test_bit(int nr, uint* addr) {
  * */
 bool
 test_and_set_bit(int nr, uint* addr) {
+    int e = splhi();
     int oldbit = ((*addr) & (1 << nr));
     *addr = (*addr) | (1 << nr);
+    splx(e);
     return oldbit != 0;
 }
 
@@ -38,8 +50,10 @@ test_and_set_bit(int nr, uint* addr) {
  * */
 bool
 test_and_clear_bit(int nr, uint* addr) {
+    int e = splhi();
     int oldbit = ((*addr) & (1 << nr));
     *addr = ((*addr) | (1 << nr)) ^ (1 << nr);
+    splx(e);
     return oldbit != 0;
 }
 

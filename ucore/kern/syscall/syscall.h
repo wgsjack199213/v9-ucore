@@ -35,7 +35,7 @@ sys_exec(uint32_t arg[]) {
     uint32_t *args = arg[1];
     size_t len = (size_t)args[0];
     unsigned char *binary = (unsigned char *)args[1];
-    size_t size = (size_t)arg[2];
+    size_t size = (size_t)args[2];
     return do_execve(name, len, binary, size);
 }
 
@@ -69,12 +69,12 @@ sys_pgdir(uint32_t arg[]) {
 }
 
 int
-syscall(struct trapframe *tf) {
+syscall() {
+    struct trapframe *tf = current->tf;
     uint32_t arg[2];
     int num = tf->tf_regs.a;
     arg[0] = tf->tf_regs.b;
     arg[1] = tf->tf_regs.c;
-
     switch (num) {
         case SYS_exit:
             return sys_exit(arg);

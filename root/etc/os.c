@@ -57,6 +57,7 @@ struct buf {
 //  struct buf *qnext;     // disk queue XXX
   uchar *data;
 };
+
 enum { B_BUSY  = 1,      // buffer is locked by some process
        B_VALID = 2,      // buffer has been read from disk
        B_DIRTY = 4};     // buffer needs to be written to disk
@@ -488,7 +489,7 @@ uint balloc()
       if (bp->data[bi] == 0xff) continue;
       for (bb = 0; bb < 8; bb++) {
         if (bp->data[bi] & (1 << bb)) continue; // is block free?
-        bp->data[bi] |= (1 << bb);  // mark block in use
+        bp->data[bi] |= (1 << bb);  // mark block in use???
         bwrite(bp);
         brelse(bp);
         return b*(4096*8) + bi*8 + bb;
@@ -511,7 +512,7 @@ bfree(uint b)
   m = 1 << (b & 7);
   b = (b / 8) & 4095;
   if (!(bp->data[b] & m)) panic("freeing free block");
-  bp->data[b] &= ~m;  // mark block free on disk
+  bp->data[b] &= ~m;  // mark block free on disk???
   bwrite(bp);
   brelse(bp);
 }
@@ -667,7 +668,7 @@ iput(struct inode *ip)
   }
   ip->ref--;
   splx(e);
-}
+}】
 
 // common idiom: unlock, then put
 iunlockput(struct inode *ip)
@@ -863,7 +864,8 @@ int isdirempty(struct inode *dp)
 }
 
 // paths:
-// Copy the next path element from path into name.  Return a pointer to the element following the copied one.
+// Copy the next path element from path into name.  
+// Return a pointer to the element following the copied one.
 // The returned path has no leading slashes, so the caller can check *path=='\0' to see if the name is the last one.
 // If no name to remove, return 0.
 //
@@ -1183,6 +1185,7 @@ int read(int fd, char *addr, int n)
   }
   panic("read");
 }
+
 int write(int fd, char *addr, int n)
 {
   int r, h[2]; struct file *f;
@@ -2003,6 +2006,7 @@ uint *copyuvm(uint *pd, uint sz)
 
 swtch(int *old, int new) // switch stacks
 {
+  printf("gg\n");
   asm(LEA,0); // a = sp
   asm(LBL,8); // b = old
   asm(SX,0);  // *b = a
@@ -2013,7 +2017,7 @@ swtch(int *old, int new) // switch stacks
 scheduler()
 {
   int n;
-  
+  printf("gg1\n");
   for (n = 0; n < NPROC; n++) {  // XXX do me differently
     proc[n].next = &proc[(n+1)&(NPROC-1)];
     proc[n].prev = &proc[(n-1)&(NPROC-1)];
@@ -2023,6 +2027,7 @@ scheduler()
   pdir(V2P+(uint)(u->pdir));
   u->state = RUNNING;
   swtch(&n, u->context);
+  
   panic("scheduler returned!\n");
 }
 
@@ -2117,6 +2122,7 @@ trap(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc)
   case FTIMER: 
   case FTIMER + USER: 
     ticks++;
+
     wakeup(&ticks);
 
     // force process exit if it has been killed and is in user space
@@ -2125,6 +2131,7 @@ trap(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc)
     // force process to give up CPU on clock tick
     if (u->state != RUNNING) { printf("pid=%d state=%d\n", u->pid, u->state); panic("!\n"); }        
     u->state = RUNNABLE;
+    printf("%d\n", ticks);
     sched();
 
     if (u->killed && (fc & USER)) exit(-1);

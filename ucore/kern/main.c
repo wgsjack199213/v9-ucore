@@ -17,14 +17,12 @@ void kern_init() {
     // cons_init();                // init the console
 
     // printf("(THU.CST) os is loading ...\n");
-
+    printf("%x\n", kern_init);
     pmm_init();                 // init physical memory management
 
     idt_init();                 // init interrupt descriptor table
 
     asm(STI);                   // enable irq interrupt
-
-    tlb_clear_enable = 1;
 
     spage(1);
 

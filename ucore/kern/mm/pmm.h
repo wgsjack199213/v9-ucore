@@ -22,6 +22,7 @@ uintptr_t boot_cr3;
 // virtual address of end of bss
 uint endbss;
 uint page_enable;
+uint tlb_clear_enable;
 
 /* *
  * PADDR - takes a kernel virtual address (an address that points above KERNBASE),
@@ -347,8 +348,6 @@ struct Page* get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
     return NULL;
 }
 
-tlb_clear_enable = 0;
-
 // invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
 void tlb_invalidate(pde_t *pgdir, uintptr_t la) {
@@ -569,7 +568,7 @@ void check_boot_pgdir(void) {
     int i;
     struct Page *p;
     char *str = "ucore: Hello world!!";
-
+    
     for (i = 0; i < npage; i += PGSIZE) {
         ptep = get_pte(boot_pgdir, KADDR(i), 0);
         assert(ptep != NULL);
@@ -587,8 +586,7 @@ void check_boot_pgdir(void) {
     
     assert(page_insert(boot_pgdir, p, 0x100 + PGSIZE, PTE_W) == 0);
     assert(page_ref(p) == 2);
-    
-    
+
     strcpy((void *)0x100, str);
     assert(strcmp((void *)0x100, (void *)(0x100 + PGSIZE)) == 0);
 
@@ -674,12 +672,19 @@ void print_pgdir(void) {
     printf("--------------------- END ---------------------\n");
 }
 
+uint getsp() {
+    asm(LEA, 8);
+}
+
+int geta() {
+
+}
+
 void kmalloc_init();
 
 void check_and_return() {
     list_entry_t *head = &free_area.free_list;
 
-    // int i;
     //reload gdt(third time,the last time) to map all physical memory
     //virtual_addr 0~4G=liear_addr 0~4G
     //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS  
@@ -698,19 +703,17 @@ void check_and_return() {
         if (head->next == &free_area.free_list) break;
         head = list_next(head);
     }
-    
+        
     check_boot_pgdir();
     print_pgdir();
 
     kmalloc_init();
-}
 
-uint getsp() {
-    asm(LEA, 8);
+    *(uint*)(getsp()+8) += KERNBASE;
+    // printf("%x\n", *(uint*)(getsp()+8));
 }
 
 static char kstack[4096]; // temp kernel stack
-
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
@@ -718,6 +721,8 @@ pmm_init() {
     int *ksp;              // temp kernel stack pointer
 
     page_enable = 0;
+
+    tlb_clear_enable = 0;
     //We need to alloc/free the physical memory (granularity is 4KB or other size).
     //So a framework of physical memory manager (struct pmm_manager)is defined in pmm.h
     //First we should init a physical memory manager(pmm) based on the framework.
@@ -758,6 +763,7 @@ pmm_init() {
     pdir(boot_cr3);
     spage(1);
 
+    tlb_clear_enable = 1;
     //now the basic virtual memory map(see memalyout.h) is established.
     //check the correctness of the basic virtual memory map.
     ksp = KERNBASE + getsp();
@@ -765,7 +771,6 @@ pmm_init() {
     asm(SSP);
     *(uint *)(getsp()+8) += KERNBASE;
     *(uint *)(getsp()+16) += KERNBASE;
-
     ksp = (uint)(check_and_return) + KERNBASE;
     asm(LL, 4);
     asm(JSRA);

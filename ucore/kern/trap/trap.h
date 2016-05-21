@@ -4,21 +4,7 @@
 #include <syscall.h>
 #include <tfstruct.h>
 
-enum {    // processor fault codes
-    FMEM,   // bad physical address
-    FTIMER, // timer interrupt
-    FKEYBD, // keyboard interrupt
-    FPRIV,  // privileged instruction
-    FINST,  // illegal instruction
-    FSYS,   // software trap
-    FARITH, // arithmetic trap
-    FIPAGE, // page fault on opcode fetch
-    FWPAGE, // page fault on write
-    FRPAGE, // page fault on read
-    USER=16 // user mode exception
-};
-
-uint ticks;
+#define TICK_NUM 100
 
 void trapname(int fc) {
   switch (fc) {
@@ -67,13 +53,6 @@ void trapname(int fc) {
   }
 }
 
-uint trap_in_kernel(struct trapframe *tf) {
-  if (tf->fc >= USER)
-    return 0;
-  else
-    return 1;
-}
-
 void print_pgfault(struct trapframe *tf) {
     /* error_code:
      * bit 0 == 0 means no page found, 1 means protection fault
@@ -86,14 +65,32 @@ void print_pgfault(struct trapframe *tf) {
             (tf->tf_regs.b & 1) ? "protection fault" : "no page found");
 }
 
-int pgfault_handler(struct trapframe *tf) {
-    print_pgfault(tf);
-    if (check_mm_struct != NULL) {
-        return do_pgfault(check_mm_struct, tf->fc, lvadr());
+// int pgfault_handler(struct trapframe *tf) {
+//     print_pgfault(tf);
+//     if (check_mm_struct != NULL) {
+//         return do_pgfault(check_mm_struct, tf->fc, lvadr());
+//     }
+//     panic("unhandled page fault.\n");
+// }
+int pgfault_handler(struct  trapframe *tf) {
+    struct mm_struct *mm;
+    if(check_mm_struct != NULL) {
+        print_pgfault(tf);
     }
-    panic("unhandled page fault.\n");
+    if (check_mm_struct != NULL) {
+        assert(current == idleproc);
+        mm = check_mm_struct;
+    }
+    else {
+        if (current == NULL) {
+            print_trapframe(tf);
+            print_pgfault(tf);
+            panic("unhandled page fault.\n");
+        }
+        mm = current->mm;
+    }
+    return do_pgfault(check_mm_struct, tf->fc, lvadr());
 }
-
 
 void trap_dispatch(struct trapframe *tf)
 {
@@ -101,9 +98,10 @@ void trap_dispatch(struct trapframe *tf)
   uint ret;
   print_trapframe(tf);
   switch (tf -> fc) {
-    case FSYS: panic("FSYS from kernel");
+    case FSYS: 
+      //panic("FSYS from kernel");
     case FSYS + USER:
-      tf->tf_regs.a = syscall(tf);
+      tf->tf_regs.a = syscall();
       return;
     case FMEM:
       panic("FMEM from kernel");
@@ -142,15 +140,27 @@ void trap_dispatch(struct trapframe *tf)
     case FRPAGE + USER:
       if ((ret = pgfault_handler(tf)) != 0) {
             print_trapframe(tf);
-            panic("handle pgfault failed. %e\n", ret);
+            if (current == NULL) {
+                panic("handle pgfault failed. ret=%d\n", ret);
+            }
+            else {
+                if (trap_in_kernel(tf)) {
+                    panic("handle pgfault failed in kernel mode. ret=%d\n", ret);
+                }
+                printf("killed by kernel.\n");
+                panic("handle user mode pgfault failed. ret=%d\n", ret);
+            }
       }
       tf->pc = (uint *)(tf->pc) - 1;
       spage(1);
       return;
     case FTIMER:
     case FTIMER + USER:
-      ticks = ticks + 1;
-      printf("%x\n", ticks);
+      ticks ++;
+      if (ticks % TICK_NUM == 0) {
+          assert(current != NULL);
+          current->need_resched = 1;
+      }
       return;
     case FKEYBD:
     case FKEYBD + USER:
@@ -159,8 +169,38 @@ void trap_dispatch(struct trapframe *tf)
   }
 }
 
-void trap(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc) {
-  trap_dispatch(&sp);
+void trap(struct trapframe *tf) {
+    // dispatch based on what type of trap occurred
+    // used for previous projects
+    struct trapframe *otf;
+    bool in_kernel;
+
+    if (current == NULL) {
+        trap_dispatch(tf);
+    }
+    else {
+        // keep a trapframe chain in stack
+        otf = current->tf;
+        current->tf = tf;
+        in_kernel = trap_in_kernel(tf);
+
+        trap_dispatch(tf);
+    
+        current->tf = otf;
+        if (!in_kernel) {
+            if (current->flags & PF_EXITING) {
+                do_exit(-E_KILLED);
+            }
+            if (current->need_resched) {
+                schedule();
+            }
+        }
+    }
+
+}
+
+void trap_before(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc) {
+    trap(&sp);
 }
 
 void alltraps()
@@ -171,7 +211,7 @@ void alltraps()
   asm(PSHF);
   asm(PSHG);
   asm(LUSP); asm(PSHA);
-  trap();
+  trap_before();
   asm(POPA); asm(SUSP);
   asm(POPG);
   asm(POPF);

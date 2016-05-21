@@ -1,5 +1,22 @@
 #ifndef __TRAP_TFSTRUCT_H__
 #define __TRAP_TFSTRUCT_H__
+
+enum {    // processor fault codes
+    FMEM,   // bad physical address
+    FTIMER, // timer interrupt
+    FKEYBD, // keyboard interrupt
+    FPRIV,  // privileged instruction
+    FINST,  // illegal instruction
+    FSYS,   // software trap
+    FARITH, // arithmetic trap
+    FIPAGE, // page fault on opcode fetch
+    FWPAGE, // page fault on write
+    FRPAGE, // page fault on read
+    USER=16 // user mode exception
+};
+
+uint ticks;
+
 struct pushregs {
     int sp, pad1;
     double g;
@@ -35,6 +52,11 @@ void print_trapframe(struct trapframe *tf) {
     // printf("Error Code: %e\n", tf->fc);
     printf("PC : 0x%x\n", tf->pc);
     printf("\n");
+}
+
+bool
+trap_in_kernel(struct trapframe *tf) {
+    return (tf->fc >= USER);
 }
 
 #endif
