@@ -1,5 +1,6 @@
 #ifndef __LIBS_ATOMIC_H__
 #define __LIBS_ATOMIC_H__
+#include <v9.h>
 
 set_bit(int nr, uint* addr) {
     int e = splhi();
