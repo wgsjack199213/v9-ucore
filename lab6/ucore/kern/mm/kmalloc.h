@@ -288,7 +288,7 @@ void kfree(void *block)
 }
 
 
-unsigned int ksize(const void *block)
+unsigned int ksize(void *block)
 {
 	bigblock_t *bb;
 	unsigned long flags;

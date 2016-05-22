@@ -2,6 +2,7 @@
 #define __KERN_PROCESS_PSTRUCT_H__
 
 #include <hash.h>
+#include <skew_heap.h>
 
 //TODO move to unistd.h
 /* SYS_fork flags */
@@ -46,6 +47,13 @@ struct proc_struct {
     int exit_code;                              // exit code (be sent to parent proc)
     uint32_t wait_state;                        // waiting state
     struct proc_struct *cptr, *yptr, *optr;     // relations between processes
+
+    struct run_queue *rq;                       // running queue contains Process
+    list_entry_t run_link;                      // the entry linked in run queue
+    int time_slice;                             // time slice for occupying the CPU
+    skew_heap_entry_t lab6_run_pool;            // FOR LAB6 ONLY: the entry in the run pool
+    uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process 
+    uint32_t lab6_priority;                     // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
 };
 
 #define PF_EXITING                  0x00000001      // getting shutdown
@@ -60,7 +68,6 @@ int kernel_thread(funcptr_t fn, void *arg, uint32_t clone_flags);
 char *set_proc_name(struct proc_struct *proc, char *name);
 char *get_proc_name(struct proc_struct *proc);
 // void cpu_idle(void);
-//
 // struct proc_struct *find_proc(int pid);
 int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf);
 int do_exit(int error_code);

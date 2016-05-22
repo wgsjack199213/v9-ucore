@@ -68,6 +68,20 @@ sys_pgdir(uint32_t arg[]) {
     return 0;
 }
 
+static int
+sys_gettime(uint32_t arg[]) {
+    return (int)ticks;
+}
+
+static int
+sys_lab6_set_priority(uint32_t arg[])
+{
+    uint32_t priority = (uint32_t)arg[0];
+    lab6_set_priority(priority);
+    return 0;
+}
+
+
 int
 syscall() {
     struct trapframe *tf = current->tf;
@@ -94,6 +108,10 @@ syscall() {
             return sys_putc(arg);
         case SYS_pgdir:
             return sys_pgdir(arg);
+        case SYS_gettime:
+            return sys_gettime(arg);
+        case SYS_lab6_set_priority:
+            return sys_lab6_set_priority(arg);
     }
 
     print_trapframe(tf);

@@ -123,7 +123,7 @@ pde_t *  vpd = (pde_t *)PGADDR(PDX(VPT), PDX(VPT), 0);
 // only needs to implement the methods in pmm_manager class, then XXX_pmm_manager can be used
 // by ucore to manage the total physical memory space.
 struct pmm_manager {
-    char *name;                                 // XXX_pmm_manager's name
+    char* name;                                 // XXX_pmm_manager's name
     void* init;
     void* init_memmap;
     void* alloc_pages;

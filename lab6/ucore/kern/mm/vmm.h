@@ -450,7 +450,7 @@ user_mem_check(struct mm_struct *mm, uintptr_t addr, size_t len, bool write) {
 }
 
 bool
-copy_from_user(struct mm_struct *mm, void *dst, const void *src, size_t len, bool writable) {
+copy_from_user(struct mm_struct *mm, void *dst, void *src, size_t len, bool writable) {
     if (!user_mem_check(mm, (uintptr_t)src, len, writable)) {
         return 0;
     }
@@ -459,7 +459,7 @@ copy_from_user(struct mm_struct *mm, void *dst, const void *src, size_t len, boo
 }
 
 bool
-copy_to_user(struct mm_struct *mm, void *dst, const void *src, size_t len) {
+copy_to_user(struct mm_struct *mm, void *dst, void *src, size_t len) {
     if (!user_mem_check(mm, (uintptr_t)dst, len, 1)) {
         return 0;
     }

@@ -8,7 +8,6 @@
 #include <default_pmm.h>
 #include <trap.h>
 #include <swap.h>
-#include <skew_heap.h>
 #include <kmalloc.h>
 #include <proc.h>
 
@@ -27,6 +26,8 @@ void kern_init() {
     spage(1);
 
     vmm_init();                 // init virtual memory management
+
+    sched_init();               // init scheduler
 
     swap_init();                // init swap
 
