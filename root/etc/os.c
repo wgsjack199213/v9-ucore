@@ -668,7 +668,7 @@ iput(struct inode *ip)
   }
   ip->ref--;
   splx(e);
-}】
+}
 
 // common idiom: unlock, then put
 iunlockput(struct inode *ip)
@@ -2006,7 +2006,6 @@ uint *copyuvm(uint *pd, uint sz)
 
 swtch(int *old, int new) // switch stacks
 {
-  printf("gg\n");
   asm(LEA,0); // a = sp
   asm(LBL,8); // b = old
   asm(SX,0);  // *b = a
@@ -2017,7 +2016,6 @@ swtch(int *old, int new) // switch stacks
 scheduler()
 {
   int n;
-  printf("gg1\n");
   for (n = 0; n < NPROC; n++) {  // XXX do me differently
     proc[n].next = &proc[(n+1)&(NPROC-1)];
     proc[n].prev = &proc[(n-1)&(NPROC-1)];
@@ -2131,7 +2129,6 @@ trap(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc)
     // force process to give up CPU on clock tick
     if (u->state != RUNNING) { printf("pid=%d state=%d\n", u->pid, u->state); panic("!\n"); }        
     u->state = RUNNABLE;
-    printf("%d\n", ticks);
     sched();
 
     if (u->killed && (fc & USER)) exit(-1);
