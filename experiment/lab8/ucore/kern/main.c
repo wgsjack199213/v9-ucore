@@ -30,7 +30,9 @@ void kern_init() {
     sched_init();               // init scheduler
 
     swap_init();                // init swap
-
+    
+    fs_init();
+    
     proc_init();
 
     stmr(128*1024);        // init clock interrupt

@@ -10,6 +10,7 @@
 #include <kmalloc.h>
 #include <pstruct.h>
 #include <vmm.h>
+#include <fsstruct.h>
 
 int syscall();
 
@@ -64,6 +65,7 @@ alloc_proc(void) {
         proc->lab6_run_pool.left = proc->lab6_run_pool.right = proc->lab6_run_pool.parent = NULL;
         proc->lab6_stride = 0;
         proc->lab6_priority = 0;
+        proc->cwd = "/";
     }
     return proc;
 }
@@ -507,7 +509,7 @@ do_exit(int error_code) {
 }
 
 struct elfhdr{
-    uint magic, size, bss, entry, flags; 
+    uint magic, bss, entry, flags; 
 };
 
 uint ELF_MAGIC = 0xC0DEF00D;
@@ -516,7 +518,7 @@ uint ELF_MAGIC = 0xC0DEF00D;
  * @size:  the size of the content of binary program
  */
 static int
-load_icode(unsigned char *binary, size_t bsize) {
+load_icode(struct inode *ip, int argc, char **argv) {
 
     int ret = -E_NO_MEM;
     struct mm_struct *mm;
@@ -529,17 +531,20 @@ load_icode(unsigned char *binary, size_t bsize) {
     // //(3.3) This program is valid?
     uint32_t vm_flags, perm;
     unsigned char *from;
-    size_t off, size;
+    size_t off, size, tmp;
     uintptr_t start, end, la;
     struct trapframe *tf;
-    struct elfhdr *hdr = binary;
+    struct elfhdr hdr;
 
-    if (hdr->magic != ELF_MAGIC) {
-        ret = -E_INVAL_ELF;
-        goto bad_elf_cleanup_pgdir;
+    ilock(ip);
+    if ((tmp = readi(ip, (char *)&hdr, 0, sizeof(hdr))) < sizeof(hdr)) {
+        goto bad_mm;
     }
-
-
+    if (hdr.magic != ELF_MAGIC) {
+        ret = -E_INVAL_ELF;
+        goto bad_mm;
+    }
+    
         if (current->mm != NULL) {
             panic("load_icode: current->mm must be empty.\n");
         }
@@ -551,21 +556,22 @@ load_icode(unsigned char *binary, size_t bsize) {
         if (setup_pgdir(mm) != 0) {
             goto bad_pgdir_cleanup_mm;
         }
+        panic("xxxx");
 
         vm_flags = 0, perm = PTE_U;
         vm_flags = VM_EXEC | VM_WRITE | VM_READ;
         if (vm_flags & VM_WRITE) perm |= PTE_W;
-
-        if ((ret = mm_map(mm, USERBASE,  hdr->size + hdr->bss, vm_flags, NULL)) != 0) {
+    
+        if ((ret = mm_map(mm, USERBASE, ip->size + hdr.bss, vm_flags, NULL)) != 0) {
             goto bad_cleanup_mmap;
         }
-
-        from = (uint)(binary)+sizeof(struct elfhdr);
+    
+        from = sizeof(struct elfhdr);
         start = USERBASE;
         la = ROUNDDOWN(start, PGSIZE);
         ret = -E_NO_MEM;
         //(3.6) alloc memory, and  copy the contents of every program section (from, from+end) to process's memory (la, la+end)
-        end = USERBASE + hdr->size;
+        end = USERBASE + ip->size;
         //(3.6.1) copy TEXT/DATA section of bianry program
         while (start < end) {
             if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
@@ -575,11 +581,13 @@ load_icode(unsigned char *binary, size_t bsize) {
             if (end < la) {
                 size -= la - end;
             }
-            memcpy(page2kva(page) + off, from, size);
+            if (readi(ip, page2kva(page) + off, from, size) != size) {
+                goto bad_cleanup_mmap;
+            }
             start += size, from += size;
         }
         //(3.6.2) build BSS section of binary program
-        end = USERBASE + hdr->size + hdr->bss;
+        end = USERBASE + ip->size + hdr.bss;
         if (start < la) {
             /* ph->p_memsz == ph->p_filesz */
             if (start == end) {
@@ -604,13 +612,13 @@ load_icode(unsigned char *binary, size_t bsize) {
             memset(page2kva(page) + off, 0, size);
             start += size;
         }
-
+    
     //(4) build user stack memory
     vm_flags = VM_READ | VM_WRITE | VM_STACK;
     if ((ret = mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags, NULL)) != 0) {
         goto bad_cleanup_mmap;
     }
-
+    
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-2*PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-3*PGSIZE , PTE_USER) != NULL);
@@ -621,7 +629,7 @@ load_icode(unsigned char *binary, size_t bsize) {
     current->mm = mm;
     current->cr3 = PADDR(mm->pgdir);
     pdir(PADDR(mm->pgdir)); // lcr3(PADDR(mm->pgdir));
-
+    
     //(6) setup trapframe for user environment
     tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
@@ -636,7 +644,7 @@ load_icode(unsigned char *binary, size_t bsize) {
      */
     tf->tf_regs.sp = USTACKTOP - 32;
     tf->fc = tf->fc | 16;
-    tf->pc = USERBASE + hdr->entry;
+    tf->pc = USERBASE + hdr.entry;
     ret = 0;
 
 output:
@@ -667,6 +675,8 @@ do_execve(char *name, size_t len, unsigned char *binary, size_t size) {
     struct mm_struct *mm = current->mm;
     char local_name[PROC_NAME_LEN + 1];
     int ret;
+    struct inode *ip;
+
     if (!user_mem_check(mm, (uintptr_t)name, len, 0)) {
         return -E_INVAL;
     }
@@ -686,7 +696,10 @@ do_execve(char *name, size_t len, unsigned char *binary, size_t size) {
         }
         current->mm = NULL;
     }
-    if ((ret = load_icode(binary, size)) != 0) {
+
+    ip = namei(name);
+    
+    if ((ret = load_icode(ip, 0, 0)) != 0) {
         goto execve_exit;
     }
     set_proc_name(current, local_name);
@@ -808,7 +821,7 @@ kernel_execve(char *name, unsigned char *binary, size_t size) {
 // user_main - kernel thread used to exec a user program
 static int
 user_main(void *arg) {
-    kernel_execve("exit", memdisk, 0);
+    kernel_execve("/priority\0", 0, 0);
 }
 
 
