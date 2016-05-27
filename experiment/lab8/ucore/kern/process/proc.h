@@ -552,16 +552,17 @@ load_icode(struct inode *ip, int argc, char **argv) {
         if ((mm = mm_create()) == NULL) {
             goto bad_mm;
         }
+
+
         //(2) create a new PDT, and mm->pgdir= kernel virtual addr of PDT
         if (setup_pgdir(mm) != 0) {
             goto bad_pgdir_cleanup_mm;
         }
-        panic("xxxx");
 
         vm_flags = 0, perm = PTE_U;
         vm_flags = VM_EXEC | VM_WRITE | VM_READ;
         if (vm_flags & VM_WRITE) perm |= PTE_W;
-    
+        
         if ((ret = mm_map(mm, USERBASE, ip->size + hdr.bss, vm_flags, NULL)) != 0) {
             goto bad_cleanup_mmap;
         }
@@ -571,7 +572,7 @@ load_icode(struct inode *ip, int argc, char **argv) {
         la = ROUNDDOWN(start, PGSIZE);
         ret = -E_NO_MEM;
         //(3.6) alloc memory, and  copy the contents of every program section (from, from+end) to process's memory (la, la+end)
-        end = USERBASE + ip->size;
+        end = USERBASE + ip->size - sizeof(struct elfhdr);
         //(3.6.1) copy TEXT/DATA section of bianry program
         while (start < end) {
             if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
@@ -588,7 +589,7 @@ load_icode(struct inode *ip, int argc, char **argv) {
         }
         iunlock(ip);
         //(3.6.2) build BSS section of binary program
-        end = USERBASE + ip->size + hdr.bss;
+        end = USERBASE + ip->size - sizeof(struct elfhdr) + hdr.bss;
         if (start < la) {
             /* ph->p_memsz == ph->p_filesz */
             if (start == end) {
@@ -661,15 +662,6 @@ bad_mm:
     goto output;
 }
 
-
-static int exitfunc() {
-    while(1) {}
-}
-
-static int exitend() {
-
-}
-
 // do_execve - call exit_mmap(mm)&put_pgdir(mm) to reclaim memory space of current process
 //           - call load_icode to setup new memory space accroding binary prog.
 int
@@ -712,14 +704,12 @@ execve_exit:
     panic("already exit: %e.\n", ret);
 }
 
-
 // do_yield - ask the scheduler to reschedule
 int
 do_yield(void) {
     current->need_resched = 1;
     return 0;
 }
-
 
 // do_wait - wait one OR any children with PROC_ZOMBIE state, and free memory space of kernel stack
 //         - proc struct of this child.

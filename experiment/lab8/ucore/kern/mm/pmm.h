@@ -10,7 +10,7 @@
 #include <sync.h>
 
 #define FSSIZE 1024 * 4096
-char *memdisk;
+char memdisk[768 * 4096];
 
 #define alloc_page() alloc_pages(1)
 #define free_page(page) free_pages(page, 1)
@@ -178,7 +178,6 @@ struct mm_struct {
 };
 
 int swap_init_ok = 0;
-
 struct mm_struct *check_mm_struct;
 
 int swap_out(struct mm_struct *mm, int n, int in_tick);
@@ -189,9 +188,11 @@ alloc_pages(size_t n) {
 
     struct Page *page=NULL;
     bool intr_flag;
+
     
     while (1)
     {
+
          local_intr_save(intr_flag);
          {
             page = call1(n, pmm_manager->alloc_pages);
@@ -235,8 +236,9 @@ void page_init(void) {
     uintptr_t freemem;
     uint32_t maxpa, begin, end;
     int i;
-    maxpa = msiz() - FSSIZE;
-    memdisk = KERNBASE + maxpa;
+    maxpa = msiz();
+    for (i = 0; i < 4096 * 512; i++)
+        memdisk[i] = *(char*)(maxpa - FSSIZE + i);
     
     if (maxpa > KMEMSIZE) {
         maxpa = KMEMSIZE;
@@ -758,7 +760,6 @@ pmm_init() {
     //linear_addr KERNBASE~KERNBASE+KMEMSIZE = phy_addr 0~KMEMSIZE
     //But shouldn't use this map until enable_paging() & gdt_init() finished.
     boot_map_segment(boot_pgdir, KERNBASE, KMEMSIZE, 0, PTE_W);
-    boot_map_segment(boot_pgdir, memdisk, FSSIZE, msiz() - FSSIZE, PTE_W);
 
     //temporary map:
     //virtual_addr 3G~3G+4M = linear_addr 0~4M = linear_addr 3G~3G+4M = phy_addr 0~4M
@@ -889,3 +890,4 @@ copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end, bool share) {
 }
 
 #endif /* !__KERN_MM_PMM_H__ */
+

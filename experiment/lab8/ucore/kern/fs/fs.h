@@ -27,7 +27,8 @@ binit()
   for (b = bcache; b < bcache+NBUF; b++) {
     b->next = bfreelist.next;
     b->prev = &bfreelist;
-    b->data = alloc_page();
+    b->data = page2kva(alloc_page());
+    // printf("%x\n",b->data );
     bfreelist.next->prev = b;
     bfreelist.next = b;
   }

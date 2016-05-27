@@ -87,6 +87,8 @@ void default_init_memmap(struct Page *base, size_t n) {
     base->property = n;
 }
 
+    int hx = 0;
+
 struct Page* default_alloc_pages(size_t n) {
     list_entry_t *le, *len;
     struct Page *p, *pp, *ppp;
