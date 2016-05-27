@@ -10,7 +10,7 @@
 #include <sync.h>
 
 #define FSSIZE 1024 * 4096
-char *memdisk;//[512 * 4096];
+char *memdisk;
 
 #define alloc_page() alloc_pages(1)
 #define free_page(page) free_pages(page, 1)
@@ -236,7 +236,7 @@ void page_init(void) {
     uint32_t maxpa, begin, end;
     int i;
     maxpa = msiz() - FSSIZE;
-    memdisk = DISKBASE;
+    memdisk = KERNBASE + maxpa;
     
     if (maxpa > KMEMSIZE) {
         maxpa = KMEMSIZE;
@@ -758,7 +758,7 @@ pmm_init() {
     //linear_addr KERNBASE~KERNBASE+KMEMSIZE = phy_addr 0~KMEMSIZE
     //But shouldn't use this map until enable_paging() & gdt_init() finished.
     boot_map_segment(boot_pgdir, KERNBASE, KMEMSIZE, 0, PTE_W);
-    boot_map_segment(boot_pgdir, DISKBASE, FSSIZE, msiz() - FSSIZE, PTE_W);
+    boot_map_segment(boot_pgdir, memdisk, FSSIZE, msiz() - FSSIZE, PTE_W);
 
     //temporary map:
     //virtual_addr 3G~3G+4M = linear_addr 0~4M = linear_addr 3G~3G+4M = phy_addr 0~4M
