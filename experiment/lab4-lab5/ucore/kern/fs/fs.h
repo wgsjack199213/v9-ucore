@@ -9,4 +9,3 @@
 #define SWAP_DEV_NO         1
 
 #endif /* !__KERN_FS_FS_H__ */
-

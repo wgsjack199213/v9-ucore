@@ -13,8 +13,8 @@
  * */
 uint32_t
 hash32(uint32_t val, unsigned int bits) {
-    uint32_t hash = val * GOLDEN_RATIO_PRIME_32;
-    return (hash >> (32 - bits));
+  uint32_t hash = val * GOLDEN_RATIO_PRIME_32;
+  return (hash >> (32 - bits));
 }
 
 #endif

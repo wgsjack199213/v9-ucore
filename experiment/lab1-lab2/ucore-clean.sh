@@ -1,2 +1,2 @@
 #!/bin/sh
-rm xc xem ucore.c ucore.bin 
+rm xc xem ucore.c ucore.bin

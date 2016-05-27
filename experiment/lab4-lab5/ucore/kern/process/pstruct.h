@@ -11,10 +11,10 @@
 
 // process's state in his life cycle
 enum proc_state {
-    PROC_UNINIT = 0,  // uninitialized
-    PROC_SLEEPING,    // sleeping
-    PROC_RUNNABLE,    // runnable(maybe running)
-    PROC_ZOMBIE,      // almost dead, and wait parent proc to reclaim his resource
+  PROC_UNINIT = 0,    // uninitialized
+  PROC_SLEEPING,      // sleeping
+  PROC_RUNNABLE,      // runnable(maybe running)
+  PROC_ZOMBIE,        // almost dead, and wait parent proc to reclaim his resource
 };
 
 #define PROC_NAME_LEN               15
@@ -22,30 +22,30 @@ enum proc_state {
 #define MAX_PID                     (MAX_PROCESS * 2)
 
 struct context {
-    uint32_t pc;
-    uint32_t sp;
-    uint32_t b;
-    uint32_t c;
+  uint32_t pc;
+  uint32_t sp;
+  uint32_t b;
+  uint32_t c;
 };
 
 struct proc_struct {
-    enum proc_state state;                      // Process state
-    int pid;                                    // Process ID
-    int runs;                                   // the running times of Proces
-    uintptr_t kstack;                           // Process kernel stack
-    bool need_resched;                          // bool value: need to be rescheduled to release CPU?
-    struct proc_struct *parent;                 // the parent process
-    struct mm_struct *mm;                       // Process's memory management field
-    struct context context;                                // Switch here to run process, save sp
-    struct trapframe *tf;                       // Trap frame for current interrupt
-    uintptr_t cr3;                              // CR3 register: the base addr of Page Directroy Table(PDT)
-    uint32_t flags;                             // Process flag
-    char name[PROC_NAME_LEN + 1];               // Process name
-    list_entry_t list_link;                     // Process link list
-    list_entry_t hash_link;                     // Process hash list
-    int exit_code;                              // exit code (be sent to parent proc)
-    uint32_t wait_state;                        // waiting state
-    struct proc_struct *cptr, *yptr, *optr;     // relations between processes
+  enum proc_state state;                        // Process state
+  int pid;                                      // Process ID
+  int runs;                                     // the running times of Proces
+  uintptr_t kstack;                             // Process kernel stack
+  bool need_resched;                            // bool value: need to be rescheduled to release CPU?
+  struct proc_struct *parent;                   // the parent process
+  struct mm_struct *mm;                         // Process's memory management field
+  struct context context;                                  // Switch here to run process, save sp
+  struct trapframe *tf;                         // Trap frame for current interrupt
+  uintptr_t cr3;                                // CR3 register: the base addr of Page Directroy Table(PDT)
+  uint32_t flags;                               // Process flag
+  char name[PROC_NAME_LEN + 1];                 // Process name
+  list_entry_t list_link;                       // Process link list
+  list_entry_t hash_link;                       // Process hash list
+  int exit_code;                                // exit code (be sent to parent proc)
+  uint32_t wait_state;                          // waiting state
+  struct proc_struct *cptr, *yptr, *optr;       // relations between processes
 };
 
 #define PF_EXITING                  0x00000001      // getting shutdown
@@ -69,9 +69,9 @@ int do_exit(int error_code);
 // int do_kill(int pid);
 
 #define le2proc(le, member) \
-    to_struct((le), struct proc_struct, member)
+  to_struct((le), struct proc_struct, member)
 
-    list_entry_t proc_list;
+list_entry_t proc_list;
 
 #define HASH_SHIFT          10
 #define HASH_LIST_SIZE      (1 << HASH_SHIFT)

@@ -15,7 +15,7 @@
  * */
 
 struct list_entry {
-    struct list_entry *prev, *next;
+  struct list_entry *prev, *next;
 };
 
 typedef struct list_entry list_entry_t;
@@ -28,9 +28,9 @@ typedef struct list_entry list_entry_t;
  * */
 void
 __list_add(list_entry_t *elm, list_entry_t *prev, list_entry_t *next) {
-    prev->next = next->prev = elm;
-    elm->next = next;
-    elm->prev = prev;
+  prev->next = next->prev = elm;
+  elm->next = next;
+  elm->prev = prev;
 }
 
 /* *
@@ -41,8 +41,8 @@ __list_add(list_entry_t *elm, list_entry_t *prev, list_entry_t *next) {
  * */
 void
 __list_del(list_entry_t *prev, list_entry_t *next) {
-    prev->next = next;
-    next->prev = prev;
+  prev->next = next;
+  next->prev = prev;
 }
 
 /* *
@@ -51,7 +51,7 @@ __list_del(list_entry_t *prev, list_entry_t *next) {
  * */
 void
 list_init(list_entry_t *elm) {
-    elm->prev = elm->next = elm;
+  elm->prev = elm->next = elm;
 }
 
 
@@ -65,7 +65,7 @@ list_init(list_entry_t *elm) {
  * */
 void
 list_add_after(list_entry_t *listelm, list_entry_t *elm) {
-    __list_add(elm, listelm, listelm->next);
+  __list_add(elm, listelm, listelm->next);
 }
 
 
@@ -79,7 +79,7 @@ list_add_after(list_entry_t *listelm, list_entry_t *elm) {
  * */
 void
 list_add(list_entry_t *listelm, list_entry_t *elm) {
-    list_add_after(listelm, elm);
+  list_add_after(listelm, elm);
 }
 
 /* *
@@ -92,7 +92,7 @@ list_add(list_entry_t *listelm, list_entry_t *elm) {
  * */
 void
 list_add_before(list_entry_t *listelm, list_entry_t *elm) {
-    __list_add(elm, listelm->prev, listelm);
+  __list_add(elm, listelm->prev, listelm);
 }
 
 /* *
@@ -104,7 +104,7 @@ list_add_before(list_entry_t *listelm, list_entry_t *elm) {
  * */
 void
 list_del(list_entry_t *listelm) {
-    __list_del(listelm->prev, listelm->next);
+  __list_del(listelm->prev, listelm->next);
 }
 
 /* *
@@ -115,8 +115,8 @@ list_del(list_entry_t *listelm) {
  * */
 void
 list_del_init(list_entry_t *listelm) {
-    list_del(listelm);
-    list_init(listelm);
+  list_del(listelm);
+  list_init(listelm);
 }
 
 /* *
@@ -125,7 +125,7 @@ list_del_init(list_entry_t *listelm) {
  * */
 bool
 list_empty(list_entry_t *list) {
-    return list->next == list;
+  return list->next == list;
 }
 
 /* *
@@ -134,7 +134,7 @@ list_empty(list_entry_t *list) {
  **/
 list_entry_t *
 list_next(list_entry_t *listelm) {
-    return listelm->next;
+  return listelm->next;
 }
 
 /* *
@@ -143,10 +143,9 @@ list_next(list_entry_t *listelm) {
  **/
 list_entry_t *
 list_prev(list_entry_t *listelm) {
-    return listelm->prev;
+  return listelm->prev;
 }
 
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !__LIBS_LIST_H__ */
-

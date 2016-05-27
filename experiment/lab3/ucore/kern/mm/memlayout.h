@@ -60,12 +60,12 @@ typedef pte_t swap_entry_t;
  * that convert Page to other data types, such as phyical address.
  * */
 struct Page {
-    int ref;                        // page frame's reference counter
-    uint32_t flags;                 // array of flags that describe the status of the page frame
-    unsigned int property;          // the num of free block, used in first fit pm manager
-    list_entry_t page_link;         // free list link
-    list_entry_t pra_page_link;     // used for pra (page replace algorithm)
-    uintptr_t pra_vaddr;            // used for pra (page replace algorithm)
+  int ref;                          // page frame's reference counter
+  uint32_t flags;                   // array of flags that describe the status of the page frame
+  unsigned int property;            // the num of free block, used in first fit pm manager
+  list_entry_t page_link;           // free list link
+  list_entry_t pra_page_link;       // used for pra (page replace algorithm)
+  uintptr_t pra_vaddr;              // used for pra (page replace algorithm)
 };
 
 /* Flags describing the status of a page frame */
@@ -81,15 +81,14 @@ struct Page {
 
 // convert list entry to page
 #define le2page(le, member)                 \
-    to_struct((le), struct Page, member)
+  to_struct((le), struct Page, member)
 
 /* free_area_t - maintains a doubly linked list to record free (unused) pages */
 typedef struct {
-    list_entry_t free_list;         // the list header
-    unsigned int nr_free;           // # of free pages in this free list
+  list_entry_t free_list;           // the list header
+  unsigned int nr_free;             // # of free pages in this free list
 } free_area_t;
 
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !__KERN_MM_MEMLAYOUT_H__ */
-
