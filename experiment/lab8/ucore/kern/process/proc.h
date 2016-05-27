@@ -586,6 +586,7 @@ load_icode(struct inode *ip, int argc, char **argv) {
             }
             start += size, from += size;
         }
+        iunlock(ip);
         //(3.6.2) build BSS section of binary program
         end = USERBASE + ip->size + hdr.bss;
         if (start < la) {
@@ -655,6 +656,7 @@ bad_elf_cleanup_pgdir:
     put_pgdir(mm);
 bad_pgdir_cleanup_mm:
     mm_destroy(mm);
+    iunlock(ip);
 bad_mm:
     goto output;
 }
