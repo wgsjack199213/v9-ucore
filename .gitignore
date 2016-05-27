@@ -3,3 +3,5 @@ ucore.c
 xc
 xem
 *.DS_Store
+*~
+

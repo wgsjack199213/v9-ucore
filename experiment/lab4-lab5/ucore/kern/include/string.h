@@ -2,16 +2,15 @@
 #define __LIBS_STRING_H__
 #include <u.h>
 
-void *memcpy(void *d, void *s, uint n) { asm(LL,8); asm(LBL, 16); asm(LCL,24); asm(MCPY); asm(LL,8); }  //memcpy并返回地址
-void *memset(void *d, uint c,  uint n) { asm(LL,8); asm(LBLB,16); asm(LCL,24); asm(MSET); asm(LL,8); }  //memset并返回地址
-void *memchr(void *s, uint c,  uint n) { asm(LL,8); asm(LBLB,16); asm(LCL,24); asm(MCHR); }             //memchar并返回地址
-
-// void structcpy(void *d, void *s, uint n) {
-//     memcpy(d, s, n);
-// }
-// int strlen(void *s) {                     //获取str长度
-//   return memchr(s, 0, -1) - s;
-// }
+void *memcpy(void *d, void *s, uint n) {
+  asm (LL,8); asm (LBL, 16); asm (LCL,24); asm (MCPY); asm (LL,8);
+}
+void *memset(void *d, uint c,  uint n) {
+  asm (LL,8); asm (LBLB,16); asm (LCL,24); asm (MSET); asm (LL,8);
+}
+void *memchr(void *s, uint c,  uint n) {
+  asm (LL,8); asm (LBLB,16); asm (LCL,24); asm (MCHR);
+}
 
 xstrncpy(char *s, char *t, int n) {       // no return value unlike strncpy XXX remove me only called once
   while (n-- > 0 && (*s++ = *t++));
@@ -33,12 +32,12 @@ safestrcpy(char *s, char *t, int n) {     // like strncpy but guaranteed to null
  * */
 size_t
 strlen(char *s) {
-    size_t cnt = 0;
-    while (*s != '\0') {
-        s++;
-        cnt++;
-    }
-    return cnt;
+  size_t cnt = 0;
+  while (*s != '\0') {
+    s++;
+    cnt++;
+  }
+  return cnt;
 }
 
 /* *
@@ -56,11 +55,11 @@ strlen(char *s) {
  * */
 size_t
 strnlen(char *s, size_t len) {
-    size_t cnt = 0;
-    while (cnt < len && *s ++ != '\0') {
-        cnt ++;
-    }
-    return cnt;
+  size_t cnt = 0;
+  while (cnt < len && *s++ != '\0') {
+    cnt++;
+  }
+  return cnt;
 }
 
 /* *
@@ -78,12 +77,12 @@ strnlen(char *s, size_t len) {
 char *
 strcpy(char *dst, char *src) {
 #ifdef __HAVE_ARCH_STRCPY
-    return __strcpy(dst, src);
+  return __strcpy(dst, src);
 #else
-    char *p = dst;
-    while ((*p ++ = *src ++) != '\0')
-        /* nothing */;
-    return dst;
+  char *p = dst;
+  while ((*p++ = *src++) != '\0')
+    /* nothing */;
+  return dst;
 #endif /* __HAVE_ARCH_STRCPY */
 }
 
@@ -99,14 +98,14 @@ strcpy(char *dst, char *src) {
  * */
 char *
 strncpy(char *dst, char *src, size_t len) {
-    char *p = dst;
-    while (len > 0) {
-        if ((*p = *src) != '\0') {
-            src ++;
-        }
-        p ++, len --;
+  char *p = dst;
+  while (len > 0) {
+    if ((*p = *src) != '\0') {
+      src++;
     }
-    return dst;
+    p++, len--;
+  }
+  return dst;
 }
 
 /* *
@@ -127,12 +126,12 @@ strncpy(char *dst, char *src, size_t len) {
 int
 strcmp(char *s1, char *s2) {
 #ifdef __HAVE_ARCH_STRCMP
-    return __strcmp(s1, s2);
+  return __strcmp(s1, s2);
 #else
-    while (*s1 != '\0' && *s1 == *s2) {
-        s1 ++, s2 ++;
-    }
-    return (int)((unsigned char)*s1 - (unsigned char)*s2);
+  while (*s1 != '\0' && *s1 == *s2) {
+    s1++, s2++;
+  }
+  return (int)((unsigned char)*s1 - (unsigned char)*s2);
 #endif /* __HAVE_ARCH_STRCMP */
 }
 
@@ -149,10 +148,10 @@ strcmp(char *s1, char *s2) {
  * */
 int
 strncmp(char *s1, char *s2, size_t n) {
-    while (n > 0 && *s1 != '\0' && *s1 == *s2) {
-        n --, s1 ++, s2 ++;
-    }
-    return (n == 0) ? 0 : (int)((unsigned char)*s1 - (unsigned char)*s2);
+  while (n > 0 && *s1 != '\0' && *s1 == *s2) {
+    n--, s1++, s2++;
+  }
+  return (n == 0) ? 0 : (int)((unsigned char)*s1 - (unsigned char)*s2);
 }
 
 /* *
@@ -165,13 +164,13 @@ strncmp(char *s1, char *s2, size_t n) {
  * */
 char *
 strchr(char *s, char c) {
-    while (*s != '\0') {
-        if (*s == c) {
-            return (char *)s;
-        }
-        s ++;
+  while (*s != '\0') {
+    if (*s == c) {
+      return (char *)s;
     }
-    return NULL;
+    s++;
+  }
+  return NULL;
 }
 
 /* *
@@ -185,101 +184,13 @@ strchr(char *s, char c) {
  * */
 char *
 strfind(char *s, char c) {
-    while (*s != '\0') {
-        if (*s == c) {
-            break;
-        }
-        s ++;
+  while (*s != '\0') {
+    if (*s == c) {
+      break;
     }
-    return (char *)s;
+    s++;
+  }
+  return (char *)s;
 }
-
-//  *
-//  * strtol - converts string to long integer
-//  * @s:      the input string that contains the representation of an integer number
-//  * @endptr: reference to an object of type char *, whose value is set by the
-//  *          function to the next character in @s after the numerical value. This
-//  *          parameter can also be a null pointer, in which case it is not used.
-//  * @base:   x
-//  *
-//  * The function first discards as many whitespace characters as necessary until
-//  * the first non-whitespace character is found. Then, starting from this character,
-//  * takes as many characters as possible that are valid following a syntax that
-//  * depends on the base parameter, and interprets them as a numerical value. Finally,
-//  * a pointer to the first character following the integer representation in @s
-//  * is stored in the object pointed by @endptr.
-//  *
-//  * If the value of base is zero, the syntax expected is similar to that of
-//  * integer constants, which is formed by a succession of:
-//  * - An optional plus or minus sign;
-//  * - An optional prefix indicating octal or hexadecimal base ("0" or "0x" respectively)
-//  * - A sequence of decimal digits (if no base prefix was specified) or either octal
-//  *   or hexadecimal digits if a specific prefix is present
-//  *
-//  * If the base value is between 2 and 36, the format expected for the integral number
-//  * is a succession of the valid digits and/or letters needed to represent integers of
-//  * the specified radix (starting from '0' and up to 'z'/'Z' for radix 36). The
-//  * sequence may optionally be preceded by a plus or minus sign and, if base is 16,
-//  * an optional "0x" or "0X" prefix.
-//  *
-//  * The strtol() function returns the converted integral number as a long int value.
-//  * 
-// long
-// strtol(char *s, char **endptr, int base) {
-//     int neg = 0;
-//     long val = 0;
-//     int dig;
-
-//     // gobble initial whitespace
-//     while (*s == ' ' || *s == '\t') {
-//         s ++;
-//     }
-
-//     // plus/minus sign
-//     if (*s == '+') {
-//         s ++;
-//     }
-//     else if (*s == '-') {
-//         s ++, neg = 1;
-//     }
-
-//     // hex or octal base prefix
-//     if ((base == 0 || base == 16) && (s[0] == '0' && s[1] == 'x')) {
-//         s += 2, base = 16;
-//     }
-//     else if (base == 0 && s[0] == '0') {
-//         s ++, base = 8;
-//     }
-//     else if (base == 0) {
-//         base = 10;
-//     }
-
-//     // digits
-//     while (1) {
-
-//         if (*s >= '0' && *s <= '9') {
-//             dig = *s - '0';
-//         }
-//         else if (*s >= 'a' && *s <= 'z') {
-//             dig = *s - 'a' + 10;
-//         }
-//         else if (*s >= 'A' && *s <= 'Z') {
-//             dig = *s - 'A' + 10;
-//         }
-//         else {
-//             break;
-//         }
-//         if (dig >= base) {
-//             break;
-//         }
-//         s ++, val = (val * base) + dig;
-//         // we don't properly detect overflow!
-//     }
-
-//     if (endptr) {
-//         *endptr = (char *) s;
-//     }
-//     return (neg ? -val : val);
-// }
 
 #endif /* !__LIBS_STRING_H__ */
