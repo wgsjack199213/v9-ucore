@@ -34,7 +34,16 @@ void kern_init() {
 }
 
 main() {
+    int *ksp;
+
     static int bss;     // last variable in bss segment
     endbss = &bss;
+
+    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
+    asm(LL, 4);
+    asm(SSP);
+
     kern_init();
+
+    asm(HALT);
 }

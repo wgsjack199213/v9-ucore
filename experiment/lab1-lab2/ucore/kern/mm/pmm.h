@@ -214,7 +214,7 @@ nr_free_pages(void) {
     bool intr_flag;
     local_intr_save(intr_flag);
     {
-        ret = call0(default_pmm_manager.nr_free_pages); 
+        ret = call0(default_pmm_manager.nr_free_pages);
     }
     local_intr_restore(intr_flag);
     return ret;
@@ -267,7 +267,7 @@ boot_alloc_page(void) {
 }
 
 /*
-    get_pte 
+    get_pte
 
         - get pte and return the kernel virtual address of this pte for la
         - if the PT contians this pte didn't exist, alloc a page for PT
@@ -345,6 +345,15 @@ get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
     return NULL;
 }
 
+tlb_clear_enable = 0;
+
+// invalidate a TLB entry, but only if the page tables being
+// edited are the ones currently in use by the processor.
+void tlb_invalidate(pde_t *pgdir, uintptr_t la) {
+    if (tlb_clear_enable)
+        spage(1);
+}
+
 /*
 page_remove_pte - free an Page sturct which is related linear address la
                - and clean(invalidate) pte which is related linear address la
@@ -384,6 +393,7 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
             free_page(page);
         }
         *ptep = 0;
+        tlb_invalidate(pgdir, la);
     }
 }
 
@@ -427,6 +437,7 @@ page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
         }
     }
     *ptep = page2pa(page) | PTE_P | perm;
+    tlb_invalidate(pgdir, la);
     return 0;
 }
 
@@ -440,13 +451,13 @@ static void
 check_pgdir(void) {
     struct Page *p1, *p2;
     pte_t *ptep;
-    
+
     assert(npage <= KMEMSIZE / PGSIZE);
     assert(boot_pgdir != NULL && (uint32_t)PGOFF(boot_pgdir) == 0);
     assert(get_page(boot_pgdir, 0x0, NULL) == NULL);
-    
+
     p1 = alloc_page();
-    
+
     assert(page_insert(boot_pgdir, p1, 0x0, 0) == 0);
     assert((ptep = get_pte(boot_pgdir, 0x0, 0)) != NULL);
     assert(pte2page(*ptep) == p1);
@@ -522,18 +533,18 @@ check_boot_pgdir(void) {
     }
 
 
-    assert(PDE_ADDR(boot_pgdir[PDX(VPT)]) == PADDR(boot_pgdir));    
+    assert(PDE_ADDR(boot_pgdir[PDX(VPT)]) == PADDR(boot_pgdir));
     assert(boot_pgdir[0] == 0);
 
     p = alloc_page();
 
     assert(page_insert(boot_pgdir, p, 0x100, PTE_W) == 0);
     assert(page_ref(p) == 1);
-    
+
     assert(page_insert(boot_pgdir, p, 0x100 + PGSIZE, PTE_W) == 0);
     assert(page_ref(p) == 2);
-    
-    
+
+
     strcpy((void *)0x100, str);
     assert(strcmp((void *)0x100, (void *)(0x100 + PGSIZE)) == 0);
 
@@ -569,7 +580,7 @@ perm2str(int perm) {
         table:       the beginning addr of table
         left_store:  the pointer of the high side of table's next range
         right_store: the pointer of the low side of table's next range
-    
+
     return value: 0 - not a invalid item range, perm - a valid item range with perm permission
 */
 static int
@@ -604,7 +615,7 @@ free_area_t free_area;
 void print_pgdir(void) {
     size_t left, right = 0, perm;
     size_t l, r;
-    
+
     printf("-------------------- BEGIN --------------------\n");
     while ((perm = get_pgtable_items(0, NPDEENTRY, right, vpd, &left, &right)) != 0) {
         printf("PDE(%x) %x-%x %x ", right - left,
@@ -621,12 +632,14 @@ void print_pgdir(void) {
 }
 
 void check_and_return(void) {
-    int *ksp;              // temp kernel stack pointer
-    list_entry_t *head = &free_area.free_list;
-    
+  list_entry_t *head = &free_area.free_list;
+
+   boot_pgdir = (uint)(boot_pgdir) + KERNBASE;
+   boot_pgdir[0] = 0;
+
     load_default_pmm_manager();
     pmm_manager = &default_pmm_manager;
-    
+
     pages = (uint)(pages) + KERNBASE;
     while (1) {
         head->prev = (uint)(head->prev) + KERNBASE;
@@ -634,24 +647,23 @@ void check_and_return(void) {
         if (head->next == &free_area.free_list) break;
         head = list_next(head);
     }
-    
+
     check_boot_pgdir();
     print_pgdir();
-    
-    *ksp = *(uint *)(tmp + 4 + KERNBASE) + KERNBASE;
-    asm(LL, 4);
-    asm(SSP);
-    asm(LEV);
+
 }
+
+uint getsp() {
+    asm(LEA, 8);
+}
+
+static char kstack[4096]; // temp kernel stack
 
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
 pmm_init(void) {
     int *ksp;              // temp kernel stack pointer
-    static char kstack[1024]; // temp kernel stack
-
-    tmp = (&ksp);
 
     page_enable = 0;
     //We need to alloc/free the physical memory (granularity is 4KB or other size).
@@ -689,30 +701,22 @@ pmm_init(void) {
     //virtual_addr 3G~3G+4M = linear_addr 0~4M = linear_addr 3G~3G+4M = phy_addr 0~4M
     boot_pgdir[0] = boot_pgdir[PDX(KERNBASE)];
 
-    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
-    asm(LL, 4);
-    asm(SSP);
+    page_enable = 1;
 
     pdir(boot_cr3);
     spage(1);
-    page_enable = 1;
 
-    //reload gdt(third time,the last time) to map all physical memory
-    //virtual_addr 0~4G=liear_addr 0~4G
-    //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS
-    
-    boot_pgdir = (uint)(boot_pgdir) + KERNBASE;
-    //disable the map of virtual_addr 0~4M
-    boot_pgdir[0] = 0;
-
-    // //now the basic virtual memory map(see memalyout.h) is established.
-    // //check the correctness of the basic virtual memory map.
-    ksp = KERNBASE+(((uint)kstack + sizeof(kstack) - 8) & -8);
-    *ksp = KERNBASE + (uint)(check_and_return);
+    //now the basic virtual memory map(see memalyout.h) is established.
+    //check the correctness of the basic virtual memory map.
+    ksp = KERNBASE + getsp();
     asm(LL, 4);
     asm(SSP);
-    asm(LEV);
+    *(uint *)(getsp()+8) += KERNBASE;
+    *(uint *)(getsp()+16) += KERNBASE;
+
+    ksp = (uint)(check_and_return) + KERNBASE;
+    asm(LL, 4);
+    asm(JSRA);
 }
 
 #endif /* !__KERN_MM_PMM_H__ */
-
