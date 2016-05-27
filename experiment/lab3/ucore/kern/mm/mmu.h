@@ -62,4 +62,3 @@
 #define PTE_USER        (PTE_U | PTE_W | PTE_P)
 
 #endif /* !__KERN_MM_MMU_H__ */
-

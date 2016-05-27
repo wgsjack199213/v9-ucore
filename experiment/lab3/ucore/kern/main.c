@@ -12,47 +12,40 @@
 #include <swap.h>
 
 void kern_init() {
-    // extern char edata[], end[];
+  printf("(THU.CST) os is loading ...\n");
 
-    // memset(edata, 0,
-    //  - edata);
+  pmm_init();                   // init physical memory management
 
-    // cons_init();                // init the console
+  idt_init();                   // init interrupt descriptor table
 
-    printf("(THU.CST) os is loading ...\n");
+  asm (STI);                    // enable irq interrupt
 
-    pmm_init();                 // init physical memory management
+  tlb_clear_enable = 1;
 
-    idt_init();                 // init interrupt descriptor table
+  spage(1);
 
-    asm(STI);                   // enable irq interrupt
-    
-    tlb_clear_enable = 1;
-    
-    spage(1);
+  vmm_init();                   // init virtual memory management
 
-    vmm_init();                 // init virtual memory management
+  swap_init();                  // init swap
 
-    swap_init();                // init swap
+  stmr(128*1024*1000);          // init clock interrupt
 
-    stmr(128*1024*1000);        // init clock interrupt
-
-    while (1) {
-                                // do nothing
-    }
+  while (1) {
+    // do nothing
+  }
 }
 
 main() {
-    int *ksp;              // temp kernel stack pointer
+  int *ksp;                // temp kernel stack pointer
 
-    static int bss;     // last variable in bss segment
-    endbss = &bss;
+  static int bss;       // last variable in bss segment
+  endbss = &bss;
 
-    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
-    asm(LL, 4);
-    asm(SSP);
+  ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
+  asm (LL, 4);
+  asm (SSP);
 
-    kern_init();
+  kern_init();
 
-    asm(HALT);
+  asm (HALT);
 }
