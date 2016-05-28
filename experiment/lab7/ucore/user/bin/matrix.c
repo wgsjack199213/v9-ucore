@@ -1,10 +1,10 @@
-# 1 "ucore/user/priority.c"
+# 1 "ucore/user/matrix.c"
 # 1 "<built-in>"
 # 1 "<command-line>"
 # 1 "/usr/include/stdc-predef.h" 1 3 4
 # 1 "<command-line>" 2
-# 1 "ucore/user/priority.c"
-# 1 "ucore/user/libs/ulib.h" 1
+# 1 "ucore/user/matrix.c"
+# 1 "ucore/user/libs/io.h" 1
 
 
 
@@ -82,7 +82,7 @@ uint ROUNDDOWN(uint a, uint n) {
 uint ROUNDUP(uint a, uint n) {
  return ROUNDDOWN(a + n - 1, n);
 }
-# 5 "ucore/user/libs/ulib.h" 2
+# 5 "ucore/user/libs/io.h" 2
 # 1 "ucore/user/libs/syscall.h" 1
 
 
@@ -165,13 +165,7 @@ sys_lab6_set_priority(uint32_t priority)
 {
     syscall(255, priority);
 }
-# 6 "ucore/user/libs/ulib.h" 2
-# 1 "ucore/user/libs/io.h" 1
-
-
-
-
-
+# 6 "ucore/user/libs/io.h" 2
 # 1 "ucore/lib/printfmt.h" 1
 
 
@@ -634,7 +628,14 @@ cputs(char *str) {
     cputch('\n', &cnt);
     return cnt;
 }
-# 7 "ucore/user/libs/ulib.h" 2
+# 2 "ucore/user/matrix.c" 2
+# 1 "ucore/user/libs/ulib.h" 1
+
+
+
+
+
+
 # 1 "ucore/user/libs/panic.h" 1
 
 
@@ -721,8 +722,7 @@ lab6_set_priority(uint32_t priority)
 {
     sys_lab6_set_priority(priority);
 }
-# 2 "ucore/user/priority.c" 2
-
+# 3 "ucore/user/matrix.c" 2
 
 # 1 "ucore/lib/lib.h" 1
 
@@ -784,7 +784,7 @@ srand(unsigned int seed) {
     next = seed;
 }
 # 6 "ucore/lib/lib.h" 2
-# 5 "ucore/user/priority.c" 2
+# 5 "ucore/user/matrix.c" 2
 # 1 "ucore/user/libs/umain.h" 1
 
 
@@ -796,76 +796,85 @@ int main(void) {
     int ret = umain();
     exit(ret);
 }
-# 6 "ucore/user/priority.c" 2
+# 6 "ucore/user/matrix.c" 2
 
 
 
 
-unsigned int acc[5];
-int status[5];
-int pids[5];
+static int mata[10][10];
+static int matb[10][10];
+static int matc[10][10];
 
-static void
-spin_delay(void)
-{
-    int i;
-    int j;
-     for (i = 0; i != 200; ++ i)
-     {
-          j = !j;
-     }
+void
+work(unsigned int times) {
+    int i, j, k, size = 10;
+    for (i = 0; i < size; i ++) {
+        for (j = 0; j < size; j ++) {
+            mata[i][j] = matb[i][j] = 1;
+        }
+    }
+
+    yield();
+
+    cprintf("pid %d is running (%d times)!.\n", getpid(), times);
+
+    while (times -- > 0) {
+        for (i = 0; i < size; i ++) {
+            for (j = 0; j < size; j ++) {
+                matc[i][j] = 0;
+                for (k = 0; k < size; k ++) {
+                    matc[i][j] += mata[i][k] * matb[k][j];
+                }
+            }
+        }
+        for (i = 0; i < size; i ++) {
+            for (j = 0; j < size; j ++) {
+                mata[i][j] = matb[i][j] = matc[i][j];
+            }
+        }
+    }
+    cprintf("pid %d done!.\n", getpid());
+    exit(0);
 }
 
 int
 umain(void) {
-     int i,time;
-     memset(pids, 0, sizeof(pids));
-     lab6_set_priority(5 + 1);
+    int pids[21];
+    int times;
+    int i;
 
-     for (i = 0; i < 5; i ++) {
-          acc[i]=0;
-          if ((pids[i] = fork()) == 0) {
-               lab6_set_priority(i + 1);
-               acc[i] = 0;
-               while (1) {
-                    spin_delay();
-                    ++ acc[i];
-                    if(acc[i]%4000==0) {
-                        if((time=gettime_msec())>1000) {
-                            cprintf("child pid %d, acc %d, time %d\n",getpid(),acc[i],time);
-                            exit(acc[i]);
-                        }
-                    }
-               }
+    memset(pids, 0, sizeof(pids));
 
-          }
-          if (pids[i] < 0) {
-               goto failed;
-          }
-     }
+    for (i = 0; i < 21; i ++) {
+        if ((pids[i] = fork()) == 0) {
+            srand(i * i);
+            times = (((unsigned int)rand()) % 21);
+            cprintf("%d\n", times );
+            times = (times * times + 10) * 100;
+            work(times);
+        }
+        if (pids[i] < 0) {
+            goto failed;
+        }
+    }
 
-     cprintf("main: fork ok,now need to wait pids.\n");
+    cprintf("fork ok.\n");
 
-     for (i = 0; i < 5; i ++) {
-         status[i]=0;
-         waitpid(pids[i],&status[i]);
-         cprintf("main: pid %d, acc %d, time %d\n",pids[i],status[i],gettime_msec());
-     }
-     cprintf("main: wait pids over\n");
-     cprintf("stride sched correct result:");
-     for (i = 0; i < 5; i ++)
-     {
-         cprintf(" %d", (status[i] * 2 / status[0] + 1) / 2);
-     }
-     cprintf("\n");
+    for (i = 0; i < 21; i ++) {
+        if (wait() != 0) {
+            cprintf("wait failed.\n");
+            goto failed;
+        }
+    }
 
-     return 0;
+    cprintf("matrix pass.\n");
+    return 0;
 
 failed:
-     for (i = 0; i < 5; i ++) {
-          if (pids[i] > 0) {
-               kill(pids[i]);
-          }
-     }
-     __panic("ucore/user/priority.c", 76, "FAIL: T.T\n");
+    for (i = 0; i < 21; i ++) {
+        if (pids[i] > 0) {
+            kill(pids[i]);
+        }
+    }
+    __panic("ucore/user/matrix.c", 85, "FAIL: T.T\n");
 }

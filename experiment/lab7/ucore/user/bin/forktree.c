@@ -1,9 +1,9 @@
-# 1 "ucore/user/priority.c"
+# 1 "ucore/user/forktree.c"
 # 1 "<built-in>"
 # 1 "<command-line>"
 # 1 "/usr/include/stdc-predef.h" 1 3 4
 # 1 "<command-line>" 2
-# 1 "ucore/user/priority.c"
+# 1 "ucore/user/forktree.c"
 # 1 "ucore/user/libs/ulib.h" 1
 
 
@@ -44,7 +44,7 @@ enum {
   ACOS,SINH,COSH,TANH,SQRT,FMOD,
   IDLE
 };
-# 49 "ucore/lib/u.h"
+# 48 "ucore/lib/u.h"
 typedef unsigned char uchar;
 typedef unsigned short ushort;
 typedef unsigned int uint;
@@ -153,17 +153,6 @@ sys_putc(int c) {
 int
 sys_pgdir(void) {
     return syscall(31);
-}
-
-int
-sys_gettime(void) {
-    return syscall(17);
-}
-
-void
-sys_lab6_set_priority(uint32_t priority)
-{
-    syscall(255, priority);
 }
 # 6 "ucore/user/libs/ulib.h" 2
 # 1 "ucore/user/libs/io.h" 1
@@ -710,81 +699,9 @@ void
 print_pgdir(void) {
     sys_pgdir();
 }
-
-unsigned int
-gettime_msec(void) {
-    return (unsigned int)sys_gettime();
-}
-
-void
-lab6_set_priority(uint32_t priority)
-{
-    sys_lab6_set_priority(priority);
-}
-# 2 "ucore/user/priority.c" 2
+# 2 "ucore/user/forktree.c" 2
 
 
-# 1 "ucore/lib/lib.h" 1
-
-
-
-# 1 "ucore/lib/hash.h" 1
-
-
-
-# 1 "ucore/lib/v9.h" 1
-
-
-
-# 1 "ucore/lib/defs.h" 1
-# 5 "ucore/lib/v9.h" 2
-
-int in(port) { asm(LL,8); asm(BIN); }
-out(port, val) { asm(LL,8); asm(LBL,16); asm(BOUT); }
-ivec(void *isr) { asm(LL,8); asm(IVEC); }
-lvadr() { asm(LVAD); }
-uint msiz() { asm(MSIZ); }
-stmr(val) { asm(LL,8); asm(TIME); }
-pdir(val) { asm(LL,8); asm(PDIR); }
-spage(val) { asm(LL,8); asm(SPAG); }
-splhi() { asm(CLI); }
-splx(int e) { if (e) asm(STI); }
-# 5 "ucore/lib/hash.h" 2
-# 17 "ucore/lib/hash.h"
-uint32_t
-hash32(uint32_t val, unsigned int bits) {
-    uint32_t hash = val * 0x9e370001UL;
-    return (hash >> (32 - bits));
-}
-# 5 "ucore/lib/lib.h" 2
-# 1 "ucore/lib/rand.h" 1
-# 9 "ucore/lib/rand.h"
-unsigned int next = 1;
-
-
-
-
-
-
-int
-rand(void) {
- unsigned int result, p;
- next = (next * 1592583800 + 11) & ((1 << 32) - 1);
- p = 2147483647 + 1;
- result = next % p;
- return result;
-}
-
-
-
-
-
-void
-srand(unsigned int seed) {
-    next = seed;
-}
-# 6 "ucore/lib/lib.h" 2
-# 5 "ucore/user/priority.c" 2
 # 1 "ucore/user/libs/umain.h" 1
 
 
@@ -796,76 +713,37 @@ int main(void) {
     int ret = umain();
     exit(ret);
 }
-# 6 "ucore/user/priority.c" 2
+# 5 "ucore/user/forktree.c" 2
 
 
 
+void forktree(char *cur);
 
-unsigned int acc[5];
-int status[5];
-int pids[5];
+void
+forkchild(char *cur, char branch) {
+    char nxt[4 + 1];
 
-static void
-spin_delay(void)
-{
-    int i;
-    int j;
-     for (i = 0; i != 200; ++ i)
-     {
-          j = !j;
-     }
+    if (strlen(cur) >= 4)
+        return;
+
+    snprintf(nxt, 4 + 1, "%s%c", cur, branch);
+    if (fork() == 0) {
+        forktree(nxt);
+        yield();
+        exit(0);
+    }
+}
+
+void
+forktree(char *cur) {
+    cprintf("%04x: I am '%s'\n", getpid(), cur);
+
+    forkchild(cur, '0');
+    forkchild(cur, '1');
 }
 
 int
 umain(void) {
-     int i,time;
-     memset(pids, 0, sizeof(pids));
-     lab6_set_priority(5 + 1);
-
-     for (i = 0; i < 5; i ++) {
-          acc[i]=0;
-          if ((pids[i] = fork()) == 0) {
-               lab6_set_priority(i + 1);
-               acc[i] = 0;
-               while (1) {
-                    spin_delay();
-                    ++ acc[i];
-                    if(acc[i]%4000==0) {
-                        if((time=gettime_msec())>1000) {
-                            cprintf("child pid %d, acc %d, time %d\n",getpid(),acc[i],time);
-                            exit(acc[i]);
-                        }
-                    }
-               }
-
-          }
-          if (pids[i] < 0) {
-               goto failed;
-          }
-     }
-
-     cprintf("main: fork ok,now need to wait pids.\n");
-
-     for (i = 0; i < 5; i ++) {
-         status[i]=0;
-         waitpid(pids[i],&status[i]);
-         cprintf("main: pid %d, acc %d, time %d\n",pids[i],status[i],gettime_msec());
-     }
-     cprintf("main: wait pids over\n");
-     cprintf("stride sched correct result:");
-     for (i = 0; i < 5; i ++)
-     {
-         cprintf(" %d", (status[i] * 2 / status[0] + 1) / 2);
-     }
-     cprintf("\n");
-
-     return 0;
-
-failed:
-     for (i = 0; i < 5; i ++) {
-          if (pids[i] > 0) {
-               kill(pids[i]);
-          }
-     }
-     __panic("ucore/user/priority.c", 76, "FAIL: T.T\n");
+    forktree("");
+    return 0;
 }
