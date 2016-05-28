@@ -692,6 +692,8 @@ do_execve(char *name, size_t len, unsigned char *binary, size_t size) {
     memset(local_name, 0, sizeof(local_name));
     memcpy(local_name, name, len);
 
+    ip = namei(name);
+
     if (mm != NULL) {
         pdir(boot_cr3);
         spage(1);
@@ -702,8 +704,6 @@ do_execve(char *name, size_t len, unsigned char *binary, size_t size) {
         }
         current->mm = NULL;
     }
-
-    ip = namei(name);
 
     if ((ret = load_icode(ip, 0, 0)) != 0) {
         goto execve_exit;

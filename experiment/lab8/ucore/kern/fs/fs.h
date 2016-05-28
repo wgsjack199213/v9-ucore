@@ -474,7 +474,6 @@ struct inode *namei(char *path)
 
   // if (*path == '/') ip = iget(ROOTINO); else idup(ip = current->cwd);
   ip = iget(ROOTINO);
-
   while (path = skipelem(path, name)) {
     ilock(ip);
     if ((ip->mode & S_IFMT) != S_IFDIR || !(next = dirlookup(ip, name, 0))) {
