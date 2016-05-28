@@ -3,6 +3,7 @@
 
 #include <lib.h>
 #include <skew_heap.h>
+#include <fsstruct.h>
 
 //TODO move to unistd.h
 /* SYS_fork flags */
@@ -21,6 +22,7 @@ enum proc_state {
 #define PROC_NAME_LEN               15
 #define MAX_PROCESS                 4096
 #define MAX_PID                     (MAX_PROCESS * 2)
+#define MAX_OPEN_FILE               16
 
 struct context {
     uint32_t pc;
@@ -51,9 +53,10 @@ struct proc_struct {
     list_entry_t run_link;                      // the entry linked in run queue
     int time_slice;                             // time slice for occupying the CPU
     skew_heap_entry_t lab6_run_pool;            // FOR LAB6 ONLY: the entry in the run pool
-    uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process 
+    uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process
     uint32_t lab6_priority;                     // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
     char *cwd;
+    struct file *ofile[MAX_OPEN_FILE]; // open files
 };
 
 #define PF_EXITING                  0x00000001      // getting shutdown

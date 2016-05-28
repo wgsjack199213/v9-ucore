@@ -81,4 +81,3 @@ lab6_set_priority(uint32_t priority)
 }
 
 #endif /* !__USER_LIBS_ULIB_H__ */
-

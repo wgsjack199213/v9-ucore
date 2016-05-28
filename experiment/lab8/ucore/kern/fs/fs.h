@@ -2,20 +2,21 @@
 #define __KERN_FS_FS_H__
 
 #include <mmu.h>
+#include <console.h>
 
 // buffer cache:
 // The buffer cache is a linked list of buf structures holding cached copies of disk block contents.  Caching disk blocks.
 // in memory reduces the number of disk reads and also provides a synchronization point for disk blocks used by multiple processes.
-// 
+//
 // Interface:
 // * To get a buffer for a particular disk block, call bread.
 // * After changing buffer data, call bwrite to write it to disk.
 // * When done with the buffer, call brelse.
 // * Do not use the buffer after calling brelse.
 // * Only one process at a time can use a buffer, so do not keep them longer than necessary.
-// 
+//
 // The implementation uses three state flags internally:
-// * B_BUSY: the block has been returned from bread and has not been passed back to brelse.  
+// * B_BUSY: the block has been returned from bread and has not been passed back to brelse.
 // * B_VALID: the buffer data has been read from the disk.
 // * B_DIRTY: the buffer data has been modified and needs to be written to disk.
 binit()
@@ -42,7 +43,7 @@ static int fs_init() {
 struct buf *bget(uint sector)
 {
   struct buf *b; int e = splhi();
-  
+
 loop:  // try for cached block
   for (b = bfreelist.next; b != &bfreelist; b = b->next) {
     if (b->sector == sector) {
@@ -124,7 +125,7 @@ ilock(struct inode *ip)
   while (ip->flags & I_BUSY) panic("ilock sleep");
   ip->flags |= I_BUSY;
   splx(e);
-  
+
   if (!(ip->flags & I_VALID)) {
     bp = bread(ip->inum);
     dip = (struct dinode *)bp->data;
@@ -164,7 +165,7 @@ struct inode *iget(uint inum)
   ip->ref = 1;
   ip->flags = 0;
   splx(e);
-  
+
   return ip;
 }
 
@@ -177,7 +178,7 @@ idup(struct inode *ip)
 }
 
 // paths:
-// Copy the next path element from path into name.  
+// Copy the next path element from path into name.
 // Return a pointer to the element following the copied one.
 // The returned path has no leading slashes, so the caller can check *path=='\0' to see if the name is the last one.
 // If no name to remove, return 0.
@@ -276,11 +277,7 @@ int readi(struct inode *ip, char *dst, uint off, uint n)
   struct buf *bp;
 
   if ((ip->mode & S_IFMT) == S_IFCHR) { // S_IFBLK ??
-      panic("readi not implement");
-// //    if (ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].read) return -1;
-// //    return devsw[ip->major].read(ip, dst, n);
-//     if (ip->dir[0] >= NDEV || !devsw[ip->dir[0]].read) return -1; // XXX refactor
-//     return devsw[ip->dir[0]].read(ip, dst, n);
+    return consoleread(ip, dst, n);
   }
 
   if (off > ip->size || off + n < off) return -1;
@@ -295,8 +292,9 @@ int readi(struct inode *ip, char *dst, uint off, uint n)
   return n;
 }
 
+
 // directories:
-int namecmp(char *p, char *q) 
+int namecmp(char *p, char *q)
 {
   uint n = DIRSIZ;
   while (n) { if (!*p || *p != *q) return *p - *q; n--; p++; q++; } // XXX
@@ -378,7 +376,7 @@ itrunc(struct inode *ip)
     bfree(ip->dir[i]);
     ip->dir[i] = 0;
   }
-  
+
   for (i = 0; i < NIDIR; i++) {
     if (!ip->idir[i]) break;
     bp = bread(ip->idir[i]);
@@ -411,7 +409,7 @@ iput(struct inode *ip)
     splx(e);
     itrunc(ip);
     ip->mode = 0;
-    bfree(ip->inum); 
+    bfree(ip->inum);
     e = splhi();
     ip->flags = 0;
     // wakeup(ip);
@@ -438,6 +436,36 @@ iunlockput(struct inode *ip)
   iput(ip);
 }
 
+// write data to inode
+int writei(struct inode *ip, char *src, uint off, uint n)
+{
+  uint tot, m;
+  struct buf *bp;
+
+  if ((ip->mode & S_IFMT) == S_IFCHR) { // XXX S_IFBLK ??
+//    if (ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write) return -1;
+//    return devsw[ip->major].write(ip, src, n);
+    panic("writei");
+    // if (ip->dir[0] >= NDEV || !devsw[ip->dir[0]].write) return -1; // XXX refactor
+    // return devsw[ip->dir[0]].write(ip, src, n);
+  }
+  if (off > ip->size || off + n < off) return -1;
+  if (off + n > (NDIR + NIDIR*1024)*PGSIZE) return -1;
+
+  for (tot = n; tot; tot -= m, off += m, src += m) {
+    bp = bread(bmap(ip, off/PGSIZE));
+    if ((m = PGSIZE - off%PGSIZE) > tot) m = tot;
+    memcpy(bp->data + off%PGSIZE, src, m);
+    bwrite(bp);
+    brelse(bp);
+  }
+  if (n > 0 && off > ip->size) {
+    ip->size = off;
+    iupdate(ip);
+  }
+  return n;
+}
+
 // Look up and return the inode for a path name
 struct inode *namei(char *path)
 {
@@ -445,7 +473,7 @@ struct inode *namei(char *path)
   struct inode *ip, *next;
 
   if (*path == '/') ip = iget(ROOTINO); else idup(ip = current->cwd);
-  
+
   while (path = skipelem(path, name)) {
     ilock(ip);
     if ((ip->mode & S_IFMT) != S_IFDIR || !(next = dirlookup(ip, name, 0))) {
@@ -458,4 +486,117 @@ struct inode *namei(char *path)
   return ip;
 }
 
+// return the inode for the parent and copy the final path element into name, which must have room for DIRSIZ bytes.
+struct inode *nameiparent(char *path, char *name)
+{
+  struct inode *ip, *next;
+
+  if (*path == '/') ip = iget(ROOTINO); else idup(ip = current->cwd);
+
+  while (path = skipelem(path, name)) {
+    ilock(ip);
+    if ((ip->mode & S_IFMT) != S_IFDIR) {
+      iunlockput(ip);
+      return 0;
+    }
+    if (!*path) { // stop one level early
+      iunlock(ip);
+      return ip;
+    }
+    if (!(next = dirlookup(ip, name, 0))) {
+      iunlockput(ip);
+      return 0;
+    }
+    iunlockput(ip);
+    ip = next;
+  }
+  iput(ip);
+  return 0;
+}
+
+// write a new directory entry (name, inum) into the directory dp
+int dirlink(struct inode *dp, char *name, uint inum)
+{
+  int off;
+  struct direct de;
+  struct inode *ip;
+
+  // check that name is not present
+  if (ip = dirlookup(dp, name, 0)) {
+    iput(ip);
+    return -1;
+  }
+  // look for an empty direct
+  for (off = 0; off < dp->size; off += sizeof(de)) {
+    if (readi(dp, (char *)&de, off, sizeof(de)) != sizeof(de)) panic("dirlink read");
+    if (!de.d_ino) break;
+  }
+  xstrncpy(de.d_name, name, DIRSIZ);
+  de.d_ino = inum;
+  if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de)) panic("dirlink");
+
+  return 0;
+}
+
+// allocate a new inode with the given mode
+struct inode *ialloc(ushort mode)
+{
+  int inum;
+  struct buf *bp;
+  struct dinode *dip;
+
+  inum = balloc();
+  bp = bread(inum);
+  dip = (struct dinode *)bp->data;
+  memset(dip, 0, sizeof(*dip));
+  dip->mode = mode;
+  bwrite(bp);   // mark it allocated on the disk
+  brelse(bp);
+  return iget(inum);
+}
+
+struct inode *create(char *path, ushort mode, int dev)
+{
+  struct inode *ip, *dp;
+  char name[DIRSIZ];
+  if (!(dp = nameiparent(path, name))) return 0;
+  ilock(dp);
+
+  if (ip = dirlookup(dp, name, 0)) {
+    iunlockput(dp);
+    ilock(ip);
+    if ((mode & S_IFMT) == S_IFREG && (ip->mode & S_IFMT) == S_IFREG) return ip;
+    iunlockput(ip);
+    return 0;
+  }
+
+  if (!(ip = ialloc(mode))) panic("create: ialloc");
+
+  ilock(ip);
+  if ((mode & S_IFMT) == S_IFCHR || (ip->mode & S_IFMT) == S_IFBLK) {
+    ip->dir[0] = (dev >> 8) & 0xff;
+    ip->dir[1] = dev & 0xff;
+  }
+  ip->nlink = 1;
+  iupdate(ip);
+
+  if ((mode & S_IFMT) == S_IFDIR) {  // create . and .. entries
+    dp->nlink++;  // for ".."
+    iupdate(dp);
+    // no ip->nlink++ for ".": avoid cyclic ref count
+    if (dirlink(ip, ".", ip->inum) || dirlink(ip, "..", dp->inum)) panic("create dots");
+  }
+
+  if (dirlink(dp, name, ip->inum)) panic("create: dirlink");
+
+  iunlockput(dp);
+  return ip;
+}
+
+int mknod(char *path, int mode, int dev) {
+  struct inode *ip;
+  if (!(ip = create(path, mode, dev))) return -1;
+  iunlockput(ip);
+  return 0;
+}
 #endif /* !__KERN_FS_FS_H__ */

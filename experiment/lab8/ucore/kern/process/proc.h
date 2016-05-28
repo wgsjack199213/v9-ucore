@@ -17,6 +17,7 @@ int syscall();
 // alloc_proc - alloc a proc_struct and init all fields of proc_struct
 static struct proc_struct *
 alloc_proc(void) {
+    int i;
     struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
     if (proc != NULL) {
     //LAB4:EXERCISE1 YOUR CODE
@@ -66,6 +67,7 @@ alloc_proc(void) {
         proc->lab6_stride = 0;
         proc->lab6_priority = 0;
         proc->cwd = "/";
+        for (i = 0; i < MAX_OPEN_FILE; i++) proc->ofile[i] = 0;
     }
     return proc;
 }
@@ -509,7 +511,7 @@ do_exit(int error_code) {
 }
 
 struct elfhdr{
-    uint magic, bss, entry, flags; 
+    uint magic, bss, entry, flags;
 };
 
 uint ELF_MAGIC = 0xC0DEF00D;
@@ -544,7 +546,7 @@ load_icode(struct inode *ip, int argc, char **argv) {
         ret = -E_INVAL_ELF;
         goto bad_mm;
     }
-    
+
         if (current->mm != NULL) {
             panic("load_icode: current->mm must be empty.\n");
         }
@@ -562,11 +564,11 @@ load_icode(struct inode *ip, int argc, char **argv) {
         vm_flags = 0, perm = PTE_U;
         vm_flags = VM_EXEC | VM_WRITE | VM_READ;
         if (vm_flags & VM_WRITE) perm |= PTE_W;
-        
+
         if ((ret = mm_map(mm, USERBASE, ip->size + hdr.bss, vm_flags, NULL)) != 0) {
             goto bad_cleanup_mmap;
         }
-    
+
         from = sizeof(struct elfhdr);
         start = USERBASE;
         la = ROUNDDOWN(start, PGSIZE);
@@ -614,24 +616,24 @@ load_icode(struct inode *ip, int argc, char **argv) {
             memset(page2kva(page) + off, 0, size);
             start += size;
         }
-    
+
     //(4) build user stack memory
     vm_flags = VM_READ | VM_WRITE | VM_STACK;
     if ((ret = mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags, NULL)) != 0) {
         goto bad_cleanup_mmap;
     }
-    
+
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-2*PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-3*PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-4*PGSIZE , PTE_USER) != NULL);
-    
+
     //(5) set current process's mm, sr3, and set CR3 reg = physical addr of Page Directory
     mm_count_inc(mm);
     current->mm = mm;
     current->cr3 = PADDR(mm->pgdir);
     pdir(PADDR(mm->pgdir)); // lcr3(PADDR(mm->pgdir));
-    
+
     //(6) setup trapframe for user environment
     tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
@@ -692,7 +694,7 @@ do_execve(char *name, size_t len, unsigned char *binary, size_t size) {
     }
 
     ip = namei(name);
-    
+
     if ((ret = load_icode(ip, 0, 0)) != 0) {
         goto execve_exit;
     }
@@ -813,7 +815,8 @@ kernel_execve(char *name, unsigned char *binary, size_t size) {
 // user_main - kernel thread used to exec a user program
 static int
 user_main(void *arg) {
-    kernel_execve("/priority\0", 0, 0);
+    mknod("/CONSOLE", S_IFCHR, (1 << 8) | 1);
+    kernel_execve("/sh\0", 0, 0);
 }
 
 
@@ -873,11 +876,11 @@ proc_init(void) {
 
     current = idleproc;
     pid = kernel_thread(init_main, NULL, 0);
-    
+
     if (pid <= 0) {
         panic("create init_main failed.\n");
     }
-    
+
     initproc = find_proc(pid);
     set_proc_name(initproc, "init");
 

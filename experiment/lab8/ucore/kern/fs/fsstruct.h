@@ -9,14 +9,15 @@
 enum {
   ROOTINO = 16,
   NBUF    = 10,         // size of disk block cache
-  
+  NFILE   = 100,        // open files per system
   BUFSZ   = 16*4096,     // bitmap size
   DIRSIZ  = 252,
   NDIR    = 480,         // 1.9 MB
   NIDIR   = 512,         //   2 GB
   NIIDIR  = 8,           //  32 GB
   NIIIDIR = 4,           //  16 TB
-  NINODE  = 50,         // maximum number of active i-nodes  XXX make this more dynamic ... 
+  NINODE  = 50,         // maximum number of active i-nodes  XXX make this more dynamic ...
+  PIPESIZE = 4000,       // XXX up to a page (since pipe is a page)
 };
 
 enum { I_BUSY = 1, I_VALID = 2 };
@@ -66,12 +67,33 @@ struct buf {
   uchar *data;
 };
 
+struct pipe {
+  char data[PIPESIZE];
+  uint nread;            // number of bytes read
+  uint nwrite;           // number of bytes written
+  int readopen;          // read fd is still open
+  int writeopen;         // write fd is still open
+};
+
+struct file {
+  int type;
+  int ref;
+  char readable;
+  char writable;
+  struct pipe *pipe;     // XXX make vnode
+  struct inode *ip;
+  uint off;
+};
+
 struct inode inode[NINODE]; // inode cache XXX make dynamic and eventually power of 2, look into iget()
 struct buf bfreelist;    // linked list of all buffers, through prev/next.   bfreelist.next is most recently used
 struct buf bcache[NBUF];
+struct file file[NFILE];
 
 struct inode *namei(char *path);
 int readi(struct inode *ip, char *dst, uint off, uint n);
 ilock(struct inode *ip);
+iunlock(struct inode *ip);
+int mknod(char *path, int mode, int dev);
 
 #endif

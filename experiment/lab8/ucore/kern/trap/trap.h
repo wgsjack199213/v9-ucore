@@ -3,6 +3,7 @@
 #include <defs.h>
 #include <syscall.h>
 #include <tfstruct.h>
+#include <console.h>
 
 #define TICK_NUM 100
 
@@ -96,9 +97,9 @@ void trap_dispatch(struct trapframe *tf)
 {
   uint va;
   uint ret;
-  //print_trapframe(tf);
+  // print_trapframe(tf);
   switch (tf -> fc) {
-    case FSYS: 
+    case FSYS:
       //panic("FSYS from kernel");
     case FSYS + USER:
       tf->tf_regs.a = syscall();
@@ -177,7 +178,7 @@ void trap_dispatch(struct trapframe *tf)
        return;
     case FKEYBD:
     case FKEYBD + USER:
-      //consoleintr();
+      consoleintr();
       return;
   }
 }
@@ -198,7 +199,7 @@ void trap(struct trapframe *tf) {
         in_kernel = trap_in_kernel(tf);
 
         trap_dispatch(tf);
-    
+
         current->tf = otf;
         if (!in_kernel) {
             if (current->flags & PF_EXITING) {

@@ -7,6 +7,7 @@
 #include <proc.h>
 #include <io.h>
 #include <pmm.h>
+#include <file.h>
 
 static int
 sys_exit(uint32_t arg[]) {
@@ -74,6 +75,22 @@ sys_gettime(uint32_t arg[]) {
 }
 
 static int
+sys_read(uint32_t arg[]) {
+  int fd;
+  char *addr;
+  int n;
+  fd = arg[0];
+  addr = *(uint*)arg[1];
+  n = *((uint*)arg[1] + 1);
+  return read(fd, addr, n);
+}
+
+static int
+sys_open(uint32_t arg[]) {
+  return open(arg[0], arg[1]);
+}
+
+static int
 sys_lab6_set_priority(uint32_t arg[])
 {
     uint32_t priority = (uint32_t)arg[0];
@@ -110,6 +127,10 @@ syscall() {
             return sys_pgdir(arg);
         case SYS_gettime:
             return sys_gettime(arg);
+        case SYS_read:
+            return sys_read(arg);
+        case SYS_open:
+            return sys_open(arg);
         case SYS_lab6_set_priority:
             return sys_lab6_set_priority(arg);
     }

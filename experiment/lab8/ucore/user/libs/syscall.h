@@ -18,13 +18,21 @@ static int
 syscall(int num, ...) {
     va_list ap;
     uint32_t a[MAX_ARGS];
+    uint32_t argtmp[MAX_ARGS];
     int i, ret;
     va_start(ap, num);
     for (i = 0; i < MAX_ARGS; i ++) {
         a[i] = va_arg(ap, uint32_t);
     }
-    // va_end(ap);
-    ret = trap(num, a[0], a[1], a[2], a[3], a[4]);
+    if (num == SYS_read) {
+      argtmp[0] = a[1];
+      argtmp[1] = a[2];
+      argtmp[2] = a[3];
+      argtmp[3] = a[4];
+      ret = trap(num, a[0], argtmp);
+    } else {
+      ret = trap(num, a[0], a[1]);
+    }
     return ret;
 }
 
@@ -71,6 +79,16 @@ sys_pgdir(void) {
 int
 sys_gettime(void) {
     return syscall(SYS_gettime);
+}
+
+int
+sys_read(int fd, void *base, size_t len) {
+    return syscall(SYS_read, fd, base, len);
+}
+
+int
+sys_open(char *path, uint32_t open_flags) {
+    return syscall(SYS_open, path, open_flags);
 }
 
 void
