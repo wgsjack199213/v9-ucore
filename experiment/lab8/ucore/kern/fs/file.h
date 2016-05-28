@@ -154,4 +154,23 @@ int read(int fd, char *addr, int n)
   panic("read");
 }
 
+// increment ref count for file
+struct file *filedup(struct file *f)
+{
+  int e = splhi();
+  if (f->ref < 1) panic("filedup");
+  f->ref++;
+  splx(e);
+  return f;
+}
+
+int close(int fd)
+{
+  struct file *f;
+  if (!(f = getf(fd))) return -1;
+  current->ofile[fd] = 0;
+  fileclose(f);
+  return 0;
+}
+
 #endif

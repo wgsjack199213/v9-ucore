@@ -63,6 +63,10 @@ getpid(void) {
     return sys_getpid();
 }
 
+int exec(char* name) {
+    return sys_exec(name);
+}
+
 //print_pgdir - print the PDT&PT
 void
 print_pgdir(void) {

@@ -472,7 +472,8 @@ struct inode *namei(char *path)
   char name[DIRSIZ];
   struct inode *ip, *next;
 
-  if (*path == '/') ip = iget(ROOTINO); else idup(ip = current->cwd);
+  // if (*path == '/') ip = iget(ROOTINO); else idup(ip = current->cwd);
+  ip = iget(ROOTINO);
 
   while (path = skipelem(path, name)) {
     ilock(ip);

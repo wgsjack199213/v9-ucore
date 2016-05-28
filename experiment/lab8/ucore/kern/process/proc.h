@@ -11,6 +11,7 @@
 #include <pstruct.h>
 #include <vmm.h>
 #include <fsstruct.h>
+#include <file.h>
 
 int syscall();
 
@@ -381,6 +382,7 @@ int
 do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     int ret = -E_NO_FREE_PROC;
     int intr_flag;
+    int i;
 
     struct proc_struct *proc;
     if (nr_process >= MAX_PROCESS) {
@@ -427,6 +429,9 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     }
     copy_thread(proc, stack, tf);
 
+    for (i = 0; i < MAX_OPEN_FILE; i++)
+        if (current->ofile[i]) proc->ofile[i] = filedup(current->ofile[i]);
+
     local_intr_save(intr_flag);
     {
         proc->pid = get_pid();
@@ -457,7 +462,7 @@ bad_fork_cleanup_proc:
 int
 do_exit(int error_code) {
     struct mm_struct *mm;
-    int intr_flag;
+    int intr_flag, fd;
     struct proc_struct *proc;
 
     if (current == idleproc) {
@@ -466,7 +471,13 @@ do_exit(int error_code) {
     if (current == initproc) {
         panic("initproc exit.\n");
     }
-
+    // close all open files
+    for (fd = 0; fd < MAX_OPEN_FILE; fd++) {
+      if (current->ofile[fd]) {
+        fileclose(current->ofile[fd]);
+        current->ofile[fd] = 0;
+      }
+    }
     mm = current->mm;
     if (mm != NULL) {
         pdir(boot_cr3);
@@ -672,7 +683,6 @@ do_execve(char *name, size_t len, unsigned char *binary, size_t size) {
     char local_name[PROC_NAME_LEN + 1];
     int ret;
     struct inode *ip;
-
     if (!user_mem_check(mm, (uintptr_t)name, len, 0)) {
         return -E_INVAL;
     }

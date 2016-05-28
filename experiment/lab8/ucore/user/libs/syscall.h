@@ -91,6 +91,15 @@ sys_open(char *path, uint32_t open_flags) {
     return syscall(SYS_open, path, open_flags);
 }
 
+int
+sys_close(int fd) {
+    return syscall(SYS_close, fd);
+}
+
+int sys_exec(char *name) {
+    return syscall(SYS_exec, name);
+}
+
 void
 sys_lab6_set_priority(uint32_t priority)
 {

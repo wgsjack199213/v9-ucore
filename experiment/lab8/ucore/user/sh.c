@@ -1,6 +1,7 @@
 #include <ulib.h>
 #include <io.h>
 #include <umain.h>
+#include <string.h>
 // #include <dir.h>
 #include <file.h>
 // #include <error.h>
@@ -11,6 +12,7 @@
 #define BUFSIZE                         4096
 #define WHITESPACE                      " \t\r\n"
 #define SYMBOLS                         "<|>&;"
+#define EXEC_MAX_ARG_NUM                2
 
 enum { O_RDONLY, O_WRONLY, O_RDWR, O_CREAT = 0x100, O_TRUNC = 0x200 };
 
@@ -19,36 +21,35 @@ int fd;
 
 int
 gettoken(char **p1, char **p2) {
-    cprintf("gettoken not implement\n");
-    exit(0);
-    // char *s;
-    // int token;
-    // if ((s = *p1) == NULL) {
-    //     return 0;
-    // }
-    // while (strchr(WHITESPACE, *s) != NULL) {
-    //     *s ++ = '\0';
-    // }
-    // if (*s == '\0') {
-    //     return 0;
-    // }
-    //
-    // *p2 = s;
-    // token = 'w';
-    // if (strchr(SYMBOLS, *s) != NULL) {
-    //     token = *s, *s ++ = '\0';
-    // }
-    // else {
-    //     bool flag = 0;
-    //     while (*s != '\0' && (flag || strchr(WHITESPACE SYMBOLS, *s) == NULL)) {
-    //         if (*s == '"') {
-    //             *s = ' ', flag = !flag;
-    //         }
-    //         s ++;
-    //     }
-    // }
-    // *p1 = (*s != '\0' ? s : NULL);
-    // return token;
+    char *s;
+    int token;
+    bool flag;
+    if ((s = *p1) == NULL) {
+        return 0;
+    }
+    while (strchr(WHITESPACE, *s) != NULL) {
+        *s ++ = '\0';
+    }
+    if (*s == '\0') {
+        return 0;
+    }
+
+    *p2 = s;
+    token = 'w';
+    if (strchr(SYMBOLS, *s) != NULL) {
+        token = *s, *s ++ = '\0';
+    }
+    else {
+        flag = 0;
+        while (*s != '\0' && (flag || strchr(WHITESPACE SYMBOLS, *s) == NULL)) {
+            if (*s == '"') {
+                *s = ' ', flag = !flag;
+            }
+            s ++;
+        }
+    }
+    *p1 = (*s != '\0' ? s : NULL);
+    return token;
 }
 
 char *
@@ -112,119 +113,75 @@ reopen(int fd2, char *filename, uint32_t open_flags) {
 
 int
 testfile(char *name) {
-  cprintf("testfile not implement\n");
-  exit(0);
-
-    // int ret;
-    // if ((ret = open(name, O_RDONLY)) < 0) {
-    //     return ret;
-    // }
-    // close(ret);
-    // return 0;
+    int ret;
+    if ((ret = open(name, O_RDONLY)) < 0) {
+        return ret;
+    }
+    close(ret);
+    return 0;
 }
 
 int
 runcmd(char *cmd) {
-  cprintf("runcmd not implement\n");
-  exit(0);
+    static char argv0[BUFSIZE];
+    char *argv[EXEC_MAX_ARG_NUM + 1];
+    char *t;
+    int argc, token, ret, p[2];
+again:
+    argc = 0;
+    while (1) {
+        switch (token = gettoken(&cmd, &t)) {
+        case 'w':
+            if (argc == EXEC_MAX_ARG_NUM) {
+                cprintf("sh error: too many arguments\n");
+                return -1;
+            }
+            argv[argc ++] = t;
+            break;
+        case '<':
+        case '>':
+        case '|':
+        case '&':
+          cprintf("<%c> not support!", token);
+        case 0:
+            goto runit;
+        case ';':
+            if ((ret = fork()) == 0) {
+                goto runit;
+            }
+            else {
+                if (ret < 0) {
+                    return ret;
+                }
+                waitpid(ret, NULL);
+                goto again;
+            }
+            break;
+        default:
+            cprintf("sh error: bad return %d from gettoken\n", token);
+            return -1;
+        }
+    }
 
-//     static char argv0[BUFSIZE];
-//     char *argv[EXEC_MAX_ARG_NUM + 1];
-//     char *t;
-//     int argc, token, ret, p[2];
-// again:
-//     argc = 0;
-//     while (1) {
-//         switch (token = gettoken(&cmd, &t)) {
-//         case 'w':
-//             if (argc == EXEC_MAX_ARG_NUM) {
-//                 cprintf("sh error: too many arguments\n");
-//                 return -1;
-//             }
-//             argv[argc ++] = t;
-//             break;
-//         case '<':
-//             if (gettoken(&cmd, &t) != 'w') {
-//                 cprintf("sh error: syntax error: < not followed by word\n");
-//                 return -1;
-//             }
-//             if ((ret = reopen(0, t, O_RDONLY)) != 0) {
-//                 return ret;
-//             }
-//             break;
-//         case '>':
-//             if (gettoken(&cmd, &t) != 'w') {
-//                 cprintf("sh error: syntax error: > not followed by word\n");
-//                 return -1;
-//             }
-//             if ((ret = reopen(1, t, O_RDWR | O_TRUNC | O_CREAT)) != 0) {
-//                 return ret;
-//             }
-//             break;
-//         case '|':
-//           //  if ((ret = pipe(p)) != 0) {
-//           //      return ret;
-//           //  }
-//             if ((ret = fork()) == 0) {
-//                 close(0);
-//                 if ((ret = dup2(p[0], 0)) < 0) {
-//                     return ret;
-//                 }
-//                 close(p[0]), close(p[1]);
-//                 goto again;
-//             }
-//             else {
-//                 if (ret < 0) {
-//                     return ret;
-//                 }
-//                 close(1);
-//                 if ((ret = dup2(p[1], 1)) < 0) {
-//                     return ret;
-//                 }
-//                 close(p[0]), close(p[1]);
-//                 goto runit;
-//             }
-//             break;
-//         case 0:
-//             goto runit;
-//         case ';':
-//             if ((ret = fork()) == 0) {
-//                 goto runit;
-//             }
-//             else {
-//                 if (ret < 0) {
-//                     return ret;
-//                 }
-//                 waitpid(ret, NULL);
-//                 goto again;
-//             }
-//             break;
-//         default:
-//             cprintf("sh error: bad return %d from gettoken\n", token);
-//             return -1;
-//         }
-//     }
-//
-// runit:
-//     if (argc == 0) {
-//         return 0;
-//     }
-//     else if (strcmp(argv[0], "cd") == 0) {
-//         if (argc != 2) {
-//             return -1;
-//         }
-//         strcpy(shcwd, argv[1]);
-//         return 0;
-//     }
-//     if ((ret = testfile(argv[0])) != 0) {
-//         if (ret != -E_NOENT) {
-//             return ret;
-//         }
-//         sncprintf(argv0, sizeof(argv0), "/%s", argv[0]);
-//         argv[0] = argv0;
-//     }
-//     argv[argc] = NULL;
-//     return __exec(NULL, argv);
+runit:
+    if (argc == 0) {
+        return 0;
+    }
+    else if (strcmp(argv[0], "cd") == 0) {
+        // if (argc != 2) {
+        //     return -1;
+        // }
+        // strcpy(shcwd, argv[1]);
+        // return 0;
+        cprintf("cd not support\n");
+        return 0;
+    }
+    if ((ret = testfile(argv[0])) != 0) {
+        cprintf("file error\n");
+        return 0;
+    }
+    argv[argc] = NULL;
+    return exec(argv[0]);
 }
 
 int

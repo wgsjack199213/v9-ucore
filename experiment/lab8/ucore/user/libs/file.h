@@ -10,4 +10,9 @@ open(char *path, uint32_t open_flags) {
     return sys_open(path, open_flags);
 }
 
+int
+close(int fd) {
+    return sys_close(fd);
+}
+
 #endif

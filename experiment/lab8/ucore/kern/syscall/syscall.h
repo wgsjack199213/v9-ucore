@@ -91,6 +91,12 @@ sys_open(uint32_t arg[]) {
 }
 
 static int
+sys_close(uint32_t arg[]) {
+    int fd = (int)arg[0];
+    return close(fd);
+}
+
+static int
 sys_lab6_set_priority(uint32_t arg[])
 {
     uint32_t priority = (uint32_t)arg[0];
@@ -131,6 +137,8 @@ syscall() {
             return sys_read(arg);
         case SYS_open:
             return sys_open(arg);
+        case SYS_close:
+            return sys_close(arg);
         case SYS_lab6_set_priority:
             return sys_lab6_set_priority(arg);
     }
