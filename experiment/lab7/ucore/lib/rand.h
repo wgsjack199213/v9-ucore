@@ -15,11 +15,11 @@ unsigned int next = 1;
  * */
 int
 rand(void) {
-	unsigned int result, p;
-	next = (next * 1592583800 + 11) & ((1 << 32) - 1);
-	p = RAND_MAX + 1;
-	result = next % p;
-	return result;
+  unsigned int result, p;
+  next = (next * 1592583800 + 11) & ((1 << 32) - 1);
+  p = RAND_MAX + 1;
+  result = next % p;
+  return result;
 }
 
 /* *
@@ -28,7 +28,7 @@ rand(void) {
  * */
 void
 srand(unsigned int seed) {
-    next = seed;
+  next = seed;
 }
 
 #endif

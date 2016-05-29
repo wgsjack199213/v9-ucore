@@ -4,8 +4,7 @@
 
 int
 main(void) {
-	asm(LI, 14);
-	asm(TRAP);
-    panic("FAIL: T.T\n");
+  asm (LI, 14);
+  asm (TRAP);
+  panic("FAIL: T.T\n");
 }
-

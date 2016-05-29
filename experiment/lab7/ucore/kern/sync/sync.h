@@ -6,12 +6,12 @@
 
 bool
 __intr_save(void) {
-    return splhi();
+  return splhi();
 }
 
 void
 __intr_restore(bool flag) {
-    splx(flag);
+  splx(flag);
 }
 
 #define local_intr_save(x)      do { x = __intr_save(); } while (0)
@@ -19,4 +19,3 @@ __intr_restore(bool flag) {
 
 
 #endif /* !__KERN_SYNC_SYNC_H__ */
-

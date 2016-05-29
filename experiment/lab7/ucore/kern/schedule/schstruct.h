@@ -8,53 +8,53 @@
 #define MAX_TIME_SLICE 5
 
 typedef struct {
-    unsigned int expires;       //the expire time
-    struct proc_struct *proc;   //the proc wait in this timer. If the expire time is end, then this proc will be scheduled
-    list_entry_t timer_link;    //the timer list
+  unsigned int expires;         //the expire time
+  struct proc_struct *proc;     //the proc wait in this timer. If the expire time is end, then this proc will be scheduled
+  list_entry_t timer_link;      //the timer list
 } timer_t;
 
 #define le2timer(le, member) to_struct((le), timer_t, member)
 
 // init a timer
-static  timer_t *
+static timer_t *
 timer_init(timer_t *timer, struct proc_struct *proc, int expires) {
-    timer->expires = expires;
-    timer->proc = proc;
-    list_init(&(timer->timer_link));
-    return timer;
+  timer->expires = expires;
+  timer->proc = proc;
+  list_init(&(timer->timer_link));
+  return timer;
 }
 
 // The introduction of scheduling classes is borrrowed from Linux, and makes the
 // core scheduler quite extensible. These classes (the scheduler modules) encapsulate
 // the scheduling policies.
 struct sched_class {
-    // the name of sched_class
-    char* name;
-    // Init the run queue
-    void* init;
-    // put the proc into runqueue, and this function must be called with rq_lock
-    void* enqueue;
-    // get the proc out runqueue, and this function must be called with rq_lock
-    void* dequeue;
-    // choose the next runnable task
-    void* pick_next;
-    // dealer of the time-tick
-    void* proc_tick;
-    /* for SMP support in the future
-     *  load_balance
-     *     void (*load_balance)(struct rq* rq);
-     *  get some proc from this rq, used in load_balance,
-     *  return value is the num of gotten proc
-     *  int (*get_proc)(struct rq* rq, struct proc* procs_moved[]);
-     */
+  // the name of sched_class
+  char* name;
+  // Init the run queue
+  void* init;
+  // put the proc into runqueue, and this function must be called with rq_lock
+  void* enqueue;
+  // get the proc out runqueue, and this function must be called with rq_lock
+  void* dequeue;
+  // choose the next runnable task
+  void* pick_next;
+  // dealer of the time-tick
+  void* proc_tick;
+  /* for SMP support in the future
+   *  load_balance
+   *     void (*load_balance)(struct rq* rq);
+   *  get some proc from this rq, used in load_balance,
+   *  return value is the num of gotten proc
+   *  int (*get_proc)(struct rq* rq, struct proc* procs_moved[]);
+   */
 };
 
 struct run_queue {
-    list_entry_t run_list;
-    unsigned int proc_num;
-    int max_time_slice;
-    // For LAB6 ONLY
-    skew_heap_entry_t* lab6_run_pool;
+  list_entry_t run_list;
+  unsigned int proc_num;
+  int max_time_slice;
+  // For LAB6 ONLY
+  skew_heap_entry_t* lab6_run_pool;
 };
 
 // void sched_init(void);

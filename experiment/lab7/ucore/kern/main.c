@@ -13,48 +13,48 @@
 
 void kern_init() {
 
-    check_sync_init();
+  check_sync_init();
 
-    // cons_init();                // init the console
+  // cons_init();                // init the console
 
-    printf("(THU.CST) os is loading ...\n");
+  printf("(THU.CST) os is loading ...\n");
 
-    pmm_init();                 // init physical memory management
+  pmm_init();                   // init physical memory management
 
-    idt_init();                 // init interrupt descriptor table
+  idt_init();                   // init interrupt descriptor table
 
-    asm(STI);                   // enable irq interrupt
+  asm (STI);                    // enable irq interrupt
 
-    spage(1);
+  spage(1);
 
-    vmm_init();                 // init virtual memory management
+  vmm_init();                   // init virtual memory management
 
-    sched_init();               // init scheduler
+  sched_init();                 // init scheduler
 
-    swap_init();                // init swap
+  swap_init();                  // init swap
 
-    proc_init();
+  proc_init();
 
-    stmr(128*1024);        // init clock interrupt
+  stmr(128*1024);          // init clock interrupt
 
-    cpu_idle();
+  cpu_idle();
 
-    // while (1) {
-    //                             // do nothing
-    // }
+  // while (1) {
+  //                             // do nothing
+  // }
 }
 
 main() {
-    int *ksp;              // temp kernel stack pointer
+  int *ksp;                // temp kernel stack pointer
 
-    static int bss;     // last variable in bss segment
-    endbss = &bss;
+  static int bss;       // last variable in bss segment
+  endbss = &bss;
 
-    ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
-    asm(LL, 4);
-    asm(SSP);
+  ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
+  asm (LL, 4);
+  asm (SSP);
 
-    kern_init();
+  kern_init();
 
-    asm(HALT);
+  asm (HALT);
 }

@@ -3,8 +3,8 @@
 #include <wait.h>
 
 typedef struct {
-    int value;
-    wait_queue_t wait_queue;
+  int value;
+  wait_queue_t wait_queue;
 } semaphore_t;
 
 #endif
