@@ -36,7 +36,7 @@ binit()
 }
 
 static int fs_init() {
-    binit();               // buffer cache
+  binit();                 // buffer cache
 }
 // look through buffer cache for sector.
 // if not found, allocate fresh block.  in either case, return B_BUSY buffer
@@ -48,11 +48,11 @@ loop:  // try for cached block
   for (b = bfreelist.next; b != &bfreelist; b = b->next) {
     if (b->sector == sector) {
       if (!(b->flags & B_BUSY)) {
-        b->flags |= B_BUSY;
-        splx(e);
-        return b;
+	b->flags |= B_BUSY;
+	splx(e);
+	return b;
       }
-    //   sleep(b)
+      //   sleep(b)
       panic("bget sleep");
       goto loop;
     }
@@ -229,11 +229,11 @@ uint balloc()
     for (bi = 0; bi < 4096; bi++) {
       if (bp->data[bi] == 0xff) continue;
       for (bb = 0; bb < 8; bb++) {
-        if (bp->data[bi] & (1 << bb)) continue; // is block free?
-        bp->data[bi] |= (1 << bb);  // mark block in use???
-        bwrite(bp);
-        brelse(bp);
-        return b*(4096*8) + bi*8 + bb;
+	if (bp->data[bi] & (1 << bb)) continue; // is block free?
+	bp->data[bi] |= (1 << bb);  // mark block in use???
+	bwrite(bp);
+	brelse(bp);
+	return b*(4096*8) + bi*8 + bb;
       }
     }
     brelse(bp);

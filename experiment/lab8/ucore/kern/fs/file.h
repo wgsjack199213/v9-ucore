@@ -6,7 +6,9 @@
 enum { O_RDONLY, O_WRONLY, O_RDWR, O_CREAT = 0x100, O_TRUNC = 0x200 };
 enum { FD_NONE, FD_PIPE, FD_INODE, FD_SOCKET, FD_RFS };
 
-struct file *getf(uint fd) { return (fd < MAX_OPEN_FILE) ? current->ofile[fd] : 0; }
+struct file *getf(uint fd) {
+  return (fd < MAX_OPEN_FILE) ? current->ofile[fd] : 0;
+}
 
 // pipes:
 void pipeclose(struct pipe *p, int writable)

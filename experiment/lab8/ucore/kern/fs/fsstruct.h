@@ -25,11 +25,11 @@ enum { B_BUSY  = 1,      // buffer is locked by some process
        B_VALID = 2,      // buffer has been read from disk
        B_DIRTY = 4};     // buffer needs to be written to disk
 enum { S_IFIFO = 0x1000, // fifo
-      S_IFCHR = 0x2000, // character
-      S_IFBLK = 0x3000, // block
-      S_IFDIR = 0x4000, // directory
-      S_IFREG = 0x8000, // regular
-      S_IFMT  = 0xF000 }; // file type mask
+       S_IFCHR = 0x2000, // character
+       S_IFBLK = 0x3000, // block
+       S_IFDIR = 0x4000, // directory
+       S_IFREG = 0x8000, // regular
+       S_IFMT  = 0xF000 };// file type mask
 
 
 struct inode { // in-memory copy of an inode

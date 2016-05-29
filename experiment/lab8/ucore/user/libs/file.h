@@ -7,12 +7,12 @@ int read(int fd, void *base, size_t len) {
 
 int
 open(char *path, uint32_t open_flags) {
-    return sys_open(path, open_flags);
+  return sys_open(path, open_flags);
 }
 
 int
 close(int fd) {
-    return sys_close(fd);
+  return sys_close(fd);
 }
 
 #endif

@@ -15,12 +15,12 @@
 int
 proc_stride_comp_f(void *a, void *b)
 {
-     struct proc_struct *p = le2proc(a, lab6_run_pool);
-     struct proc_struct *q = le2proc(b, lab6_run_pool);
-     int32_t c = p->lab6_stride - q->lab6_stride;
-     if (c > 0) return 1;
-     else if (c == 0) return 0;
-     else return -1;
+  struct proc_struct *p = le2proc(a, lab6_run_pool);
+  struct proc_struct *q = le2proc(b, lab6_run_pool);
+  int32_t c = p->lab6_stride - q->lab6_stride;
+  if (c > 0) return 1;
+  else if (c == 0) return 0;
+  else return -1;
 }
 
 /*
@@ -36,10 +36,10 @@ proc_stride_comp_f(void *a, void *b)
  */
 void
 stride_init(struct run_queue *rq) {
-     /* LAB6: 2013011343 */
-     list_init(&(rq->run_list));
-     rq->lab6_run_pool = NULL;
-     rq->proc_num = 0;
+  /* LAB6: 2013011343 */
+  list_init(&(rq->run_list));
+  rq->lab6_run_pool = NULL;
+  rq->proc_num = 0;
 }
 
 /*
@@ -57,14 +57,14 @@ stride_init(struct run_queue *rq) {
  */
 void
 stride_enqueue(struct run_queue *rq, struct proc_struct *proc) {
-     /* LAB6: 2013011343 */
-     rq->lab6_run_pool =
-          skew_heap_insert(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
-     if (proc->time_slice == 0 || proc->time_slice > rq->max_time_slice) {
-          proc->time_slice = rq->max_time_slice;
-     }
-     proc->rq = rq;
-     rq->proc_num ++;
+  /* LAB6: 2013011343 */
+  rq->lab6_run_pool =
+    skew_heap_insert(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
+  if (proc->time_slice == 0 || proc->time_slice > rq->max_time_slice) {
+    proc->time_slice = rq->max_time_slice;
+  }
+  proc->rq = rq;
+  rq->proc_num++;
 }
 
 /*
@@ -77,10 +77,10 @@ stride_enqueue(struct run_queue *rq, struct proc_struct *proc) {
  */
 void
 stride_dequeue(struct run_queue *rq, struct proc_struct *proc) {
-     /* LAB6: 2013011343 */
-     rq->lab6_run_pool =
-          skew_heap_remove(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
-     rq->proc_num --;
+  /* LAB6: 2013011343 */
+  rq->lab6_run_pool =
+    skew_heap_remove(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
+  rq->proc_num--;
 }
 /*
  * stride_pick_next pick the element from the ``run-queue'', with the
@@ -97,14 +97,14 @@ stride_dequeue(struct run_queue *rq, struct proc_struct *proc) {
  */
 struct proc_struct *
 stride_pick_next(struct run_queue *rq) {
-     /* LAB6: 2013011343 */
-     struct proc_struct *p;
-     if (rq->lab6_run_pool == NULL) return NULL;
-     p = le2proc(rq->lab6_run_pool, lab6_run_pool);
-     if (p->lab6_priority == 0)
-          p->lab6_stride += BIG_STRIDE;
-     else p->lab6_stride += BIG_STRIDE / p->lab6_priority;
-     return p;
+  /* LAB6: 2013011343 */
+  struct proc_struct *p;
+  if (rq->lab6_run_pool == NULL) return NULL;
+  p = le2proc(rq->lab6_run_pool, lab6_run_pool);
+  if (p->lab6_priority == 0)
+    p->lab6_stride += BIG_STRIDE;
+  else p->lab6_stride += BIG_STRIDE / p->lab6_priority;
+  return p;
 }
 
 /*
@@ -117,23 +117,22 @@ stride_pick_next(struct run_queue *rq) {
  */
 void
 stride_proc_tick(struct run_queue *rq, struct proc_struct *proc) {
-     /* LAB6: 2013011343 */
-     if (proc->time_slice > 0)
-          proc->time_slice --;
-     if (proc->time_slice == 0)
-          proc->need_resched = 1;
+  /* LAB6: 2013011343 */
+  if (proc->time_slice > 0)
+    proc->time_slice--;
+  if (proc->time_slice == 0)
+    proc->need_resched = 1;
 }
 
 struct sched_class default_sched_class;
 
 void load_default_sched_class() {
-  	default_sched_class.name = "stride_scheduler";
-    default_sched_class.init = stride_init;
-    default_sched_class.enqueue = stride_enqueue;
-    default_sched_class.dequeue = stride_dequeue;
-    default_sched_class.pick_next = stride_pick_next;
-    default_sched_class.proc_tick = stride_proc_tick;
+  default_sched_class.name = "stride_scheduler";
+  default_sched_class.init = stride_init;
+  default_sched_class.enqueue = stride_enqueue;
+  default_sched_class.dequeue = stride_dequeue;
+  default_sched_class.pick_next = stride_pick_next;
+  default_sched_class.proc_tick = stride_proc_tick;
 }
 
 #endif /* !__KERN_SCHEDULE_SCHED_RR_H__ */
-

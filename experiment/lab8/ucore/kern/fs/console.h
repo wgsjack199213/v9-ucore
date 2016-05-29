@@ -51,7 +51,7 @@ consoleintr()
 {
   int c;
   while ((c = in(0)) != -1) {
-  //  printf("<%d>",c); //   XXX
+    //  printf("<%d>",c); //   XXX
     if (input.w - input.r < INPUT_BUF) {
       input.buf[input.w++ % INPUT_BUF] = c;
       // wakeup(&input.r);
