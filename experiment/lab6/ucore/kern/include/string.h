@@ -2,9 +2,15 @@
 #define __LIBS_STRING_H__
 #include <u.h>
 
-void *memcpy(void *d, void *s, uint n) { asm(LL,8); asm(LBL, 16); asm(LCL,24); asm(MCPY); asm(LL,8); }  //memcpy并返回地址
-void *memset(void *d, uint c,  uint n) { asm(LL,8); asm(LBLB,16); asm(LCL,24); asm(MSET); asm(LL,8); }  //memset并返回地址
-void *memchr(void *s, uint c,  uint n) { asm(LL,8); asm(LBLB,16); asm(LCL,24); asm(MCHR); }             //memchar并返回地址
+void *memcpy(void *d, void *s, uint n) {
+  asm (LL,8); asm (LBL, 16); asm (LCL,24); asm (MCPY); asm (LL,8);
+}                                                                                                       //memcpy并返回地址
+void *memset(void *d, uint c,  uint n) {
+  asm (LL,8); asm (LBLB,16); asm (LCL,24); asm (MSET); asm (LL,8);
+}                                                                                                       //memset并返回地址
+void *memchr(void *s, uint c,  uint n) {
+  asm (LL,8); asm (LBLB,16); asm (LCL,24); asm (MCHR);
+}                                                                                                       //memchar并返回地址
 
 // void structcpy(void *d, void *s, uint n) {
 //     memcpy(d, s, n);
@@ -33,12 +39,12 @@ safestrcpy(char *s, char *t, int n) {     // like strncpy but guaranteed to null
  * */
 size_t
 strlen(char *s) {
-    size_t cnt = 0;
-    while (*s != '\0') {
-        s++;
-        cnt++;
-    }
-    return cnt;
+  size_t cnt = 0;
+  while (*s != '\0') {
+    s++;
+    cnt++;
+  }
+  return cnt;
 }
 
 /* *
@@ -56,11 +62,11 @@ strlen(char *s) {
  * */
 size_t
 strnlen(char *s, size_t len) {
-    size_t cnt = 0;
-    while (cnt < len && *s ++ != '\0') {
-        cnt ++;
-    }
-    return cnt;
+  size_t cnt = 0;
+  while (cnt < len && *s++ != '\0') {
+    cnt++;
+  }
+  return cnt;
 }
 
 /* *
@@ -78,12 +84,12 @@ strnlen(char *s, size_t len) {
 char *
 strcpy(char *dst, char *src) {
 #ifdef __HAVE_ARCH_STRCPY
-    return __strcpy(dst, src);
+  return __strcpy(dst, src);
 #else
-    char *p = dst;
-    while ((*p ++ = *src ++) != '\0')
-        /* nothing */;
-    return dst;
+  char *p = dst;
+  while ((*p++ = *src++) != '\0')
+    /* nothing */;
+  return dst;
 #endif /* __HAVE_ARCH_STRCPY */
 }
 
@@ -99,14 +105,14 @@ strcpy(char *dst, char *src) {
  * */
 char *
 strncpy(char *dst, char *src, size_t len) {
-    char *p = dst;
-    while (len > 0) {
-        if ((*p = *src) != '\0') {
-            src ++;
-        }
-        p ++, len --;
+  char *p = dst;
+  while (len > 0) {
+    if ((*p = *src) != '\0') {
+      src++;
     }
-    return dst;
+    p++, len--;
+  }
+  return dst;
 }
 
 /* *
@@ -127,12 +133,12 @@ strncpy(char *dst, char *src, size_t len) {
 int
 strcmp(char *s1, char *s2) {
 #ifdef __HAVE_ARCH_STRCMP
-    return __strcmp(s1, s2);
+  return __strcmp(s1, s2);
 #else
-    while (*s1 != '\0' && *s1 == *s2) {
-        s1 ++, s2 ++;
-    }
-    return (int)((unsigned char)*s1 - (unsigned char)*s2);
+  while (*s1 != '\0' && *s1 == *s2) {
+    s1++, s2++;
+  }
+  return (int)((unsigned char)*s1 - (unsigned char)*s2);
 #endif /* __HAVE_ARCH_STRCMP */
 }
 
@@ -149,10 +155,10 @@ strcmp(char *s1, char *s2) {
  * */
 int
 strncmp(char *s1, char *s2, size_t n) {
-    while (n > 0 && *s1 != '\0' && *s1 == *s2) {
-        n --, s1 ++, s2 ++;
-    }
-    return (n == 0) ? 0 : (int)((unsigned char)*s1 - (unsigned char)*s2);
+  while (n > 0 && *s1 != '\0' && *s1 == *s2) {
+    n--, s1++, s2++;
+  }
+  return (n == 0) ? 0 : (int)((unsigned char)*s1 - (unsigned char)*s2);
 }
 
 /* *
@@ -165,13 +171,13 @@ strncmp(char *s1, char *s2, size_t n) {
  * */
 char *
 strchr(char *s, char c) {
-    while (*s != '\0') {
-        if (*s == c) {
-            return (char *)s;
-        }
-        s ++;
+  while (*s != '\0') {
+    if (*s == c) {
+      return (char *)s;
     }
-    return NULL;
+    s++;
+  }
+  return NULL;
 }
 
 /* *
@@ -185,13 +191,13 @@ strchr(char *s, char c) {
  * */
 char *
 strfind(char *s, char c) {
-    while (*s != '\0') {
-        if (*s == c) {
-            break;
-        }
-        s ++;
+  while (*s != '\0') {
+    if (*s == c) {
+      break;
     }
-    return (char *)s;
+    s++;
+  }
+  return (char *)s;
 }
 
 //  *
@@ -223,7 +229,7 @@ strfind(char *s, char c) {
 //  * an optional "0x" or "0X" prefix.
 //  *
 //  * The strtol() function returns the converted integral number as a long int value.
-//  * 
+//  *
 // long
 // strtol(char *s, char **endptr, int base) {
 //     int neg = 0;

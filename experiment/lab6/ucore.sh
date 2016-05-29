@@ -7,5 +7,5 @@ cpp-5 -Iucore/lib -Iucore/kern/include -Iucore/kern/libs -Iucore/kern/mm -Iucore
 cpp-5  -Iucore/user/libs -Iucore/lib -Iucore/kern/include ucore/user/priority.c ucore/user/bin/priority.c
 ./xc -v -o ucore/user/bin/priority ucore/user/bin/priority.c
 ./changeHeader ucore/user/bin/priority
-./xc -v -o ucore.bin ucore.c 
+./xc -v -o ucore.bin ucore.c
 ./xem -f ucore/user/bin/priority ucore.bin

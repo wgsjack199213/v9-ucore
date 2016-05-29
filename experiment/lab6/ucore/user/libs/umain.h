@@ -5,8 +5,8 @@
 int umain(void);
 
 int main(void) {
-    int ret = umain();
-    exit(ret);
+  int ret = umain();
+  exit(ret);
 }
 
 #define main umain

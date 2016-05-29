@@ -11,8 +11,8 @@
  * */
 static void
 cputch(int c, int *cnt) {
-    sys_putc(c);
-    (*cnt) ++;
+  sys_putc(c);
+  (*cnt)++;
 }
 
 /* *
@@ -26,9 +26,9 @@ cputch(int c, int *cnt) {
  * */
 int
 vcprintf(char *fmt, va_list ap) {
-    int cnt = 0;
-    vprintfmt((void*)cputch, NO_FD, &cnt, fmt, ap);
-    return cnt;
+  int cnt = 0;
+  vprintfmt((void*)cputch, NO_FD, &cnt, fmt, ap);
+  return cnt;
 }
 
 /* *
@@ -39,14 +39,14 @@ vcprintf(char *fmt, va_list ap) {
  * */
 int
 cprintf(char *fmt, ...) {
-    va_list ap;
-    int cnt;
+  va_list ap;
+  int cnt;
 
-    va_start(ap, fmt);
-    cnt = vcprintf(fmt, ap);
-    // va_end(ap);
+  va_start(ap, fmt);
+  cnt = vcprintf(fmt, ap);
+  // va_end(ap);
 
-    return cnt;
+  return cnt;
 }
 
 /* *
@@ -55,13 +55,13 @@ cprintf(char *fmt, ...) {
  * */
 int
 cputs(char *str) {
-    int cnt = 0;
-    char c;
-    while ((c = *str ++) != '\0') {
-        cputch(c, &cnt);
-    }
-    cputch('\n', &cnt);
-    return cnt;
+  int cnt = 0;
+  char c;
+  while ((c = *str++) != '\0') {
+    cputch(c, &cnt);
+  }
+  cputch('\n', &cnt);
+  return cnt;
 }
 
 #endif /* !__USER_LIBS_IO_H__ */
