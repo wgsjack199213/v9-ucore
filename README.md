@@ -47,9 +47,323 @@
 
 - 一个显著的例子是文件系统，ucore中的文件系统使用Linux内核中移植的，非常复杂，很难修改支持硬件。我们直接使用了xv6中的驱动，在系统调用层面把文件系统和内核的其它部分做了接口的转换。
 
-## 开发过程
+## 开发过程和运行流程解析
 
 **Lab1-Lab2**
+
+####*	启动脚本描述
+
+```
+#!/bin/sh
+bash ucore-clean.sh		#清空已有的运行部件
+gcc -o xc -O3 -m32 -Ilinux -Iucore/lib ucore/tool/c.c	#编译v9的C编译器
+gcc -o xem -O3 -m32 -Ilinux -Iucore/lib ucore/tool/em.c -lm	#编译v9的C模拟器
+cpp -Iucore/lib -Iucore/kern/include -Iucore/kern/libs -Iucore/kern/mm -Iucore/kern/fs -Iucore/kern/driver -Iucore/kern/sync -Iucore/kern/trap -Iucore/kern/process -Iucore/kern/schedule -Iucore/kern/syscall ucore/kern/main.c ucore.c	#预编译整个v9-ucore的程序，将库文件合成一个程序进行编译
+./xc -v -o ucore.bin ucore.c 	#编译v9-ucore
+./xem ucore.bin		#在模拟器上运行v9-ucore
+```
+
+####*	程序结构解析
+
+
+```
+	u.h					--->	v9相关的一些定义
+	sync.h				--->	开关中断并保存状态的操作定义
+	atomic.h			--->	置位运算的原子操作定义
+	call.h				--->	进行函数指针调用的函数定义
+	defs.h				--->	ucore的相关定义
+	error.h				--->	ucore的错误定义
+	list.h				--->	指针以及其相关方法的定义
+	io.h				--->	底层读写的定义
+	printfmt.h			--->	printf的定义
+	string.h			--->	string以及内存复制拷贝的底层操作定义
+	
+	mm
+	|--default_pmm.h	--->	物理页分配算法实现
+	|--memlayout.h		--->	物理空间的构成定义
+	|--mmu.h			--->	物理地址操作的定义
+	|--pmm.h			--->	物理地址相关操作的实现
+	
+	trap
+	|--trap.h			--->	trap的相关实现
+	
+	main.c				--->	操作系统程序入口
+	
+```	
+
+####*	必要细节梳理（main.c）
+
+```
+static char kstack[4096]; 		// 临时的内核栈
+
+void kern_init() {
+  pmm_init();                   // 物理地址相关操作初始化
+  idt_init();                   // 中断的初始化
+  stmr(128*1024*1000);          // 打开时钟中断开关
+  asm (STI);                    // 打开中断开关
+  while (1) {
+    // do nothing
+  }
+}
+
+main() {
+  int *ksp;
+  static int bss;
+  endbss = &bss;				//在分配内存的时候，我们要清楚的知道text段，data段和bss段的大小，bss段管理的是未初始化的静态变量，在此处声明一个静态变量，通过获取地址来得到bss段的边界
+  ksp = ((uint)kstack + sizeof(kstack) - 8) & -8;
+  asm (LL, 4);					//a<-*(sp+4)
+  asm (SSP);					//sp<-a，在bss段中开取一段来用作系统的内核栈，如果没有这个操作，此时分配的将是物理内存的顶部，实际上物理内存的bss段以上的部分应进出页划分并通过分配算法来分配，如果使用这部分的空间作为系统内核栈将复杂许多，换句话说操作系统text、data、bss段占用的空间是不计入操作系统能够分配的空间中去的，这部分代码也不会在任何情况下从内存中被换入换出。
+  kern_init();
+  asm (HALT);
+}
+
+```
+
+####*	必要细节梳理（trap.h）
+
+```
+struct pushregs {
+    int sp, pad1;
+    double g;
+    double f;
+    int c,  pad2;
+    int b,  pad3;
+    int a,  pad4;
+};
+
+struct trapframe {
+    struct pushregs tf_regs;
+    int fc, pad5;
+    int pc, pad6;
+};
+
+//trapframe的定义，其中pad之类的是用以填充空间的，因为v9压栈是64位对齐的压栈，但寄存器都是32位的，所以多余的位也要压入填充量用以对齐，浮点寄存器由于就是64位的所以可以不用填充量。struct的空间排布就是内部成员的排布，换言之上述的定义与下述是等价的
+//	struct trapframe {
+//    	int sp, pad1;
+//    	double g;
+//    	double f;
+//    	int c,  pad2;
+//    	int b,  pad3;
+//    	int a,  pad4;
+//  	int fc, pad5;
+//	    int pc, pad6;
+//	};
+
+enum {    	// processor fault codes
+    FMEM,   // bad physical address
+    FTIMER, // timer interrupt
+    FKEYBD, // keyboard interrupt
+    FPRIV,  // privileged instruction
+    FINST,  // illegal instruction
+    FSYS,   // software trap
+    FARITH, // arithmetic trap
+    FIPAGE, // page fault on opcode fetch
+    FWPAGE, // page fault on write
+    FRPAGE, // page fault on read
+    USER=16 // user mode exception
+};
+
+//trap的类型，即下文fc(fault code)的取值有上述几种可能性，内核和用户的区分就是通过USER来进行的，例如fc为FTIMER表示内核栈的时钟中断，fc为USER+FTIMER表示用户栈的时钟中断
+```
+
+```
+void trap_dispatch(struct trapframe *tf) {
+	...
+	...
+	...
+}
+
+void trap(uint *sp, double g, double f, int c, int b, int a, int fc, uint *pc) {
+  trap_dispatch(&sp);			//将零散压入的寄存器量通过一个trapframe的指针来代替，从而方便调用，跳入trap_dispatch来真正进行中断操作
+}
+
+void alltraps()
+{
+  asm(PSHA);					//中断发生时会将当前的寄存器状况和中断类型、指令地址等压入内核栈中，用以在中断处理完成后能够恢复出现中断的现场寄存器环境从而继续进行下去
+  asm(PSHB);					//这部分汇编则是在压入a、b、c三个通用寄存器以及f、g浮点寄存器和当前sp的地址，如果在用户态则压入的是用户态的sp地址，在内核态则压入的是内核态的sp地址
+  asm(PSHC);					//fc中断类型和pc指令地址则是硬件压入栈的，不需要要软件插手
+  asm(PSHF);
+  asm(PSHG);
+  asm(LUSP); asm(PSHA);
+  trap();						//trapframe全部压入后跳转到trap进行中断处理操作
+  asm(POPA); asm(SUSP);			//将trapframe中的元素逐一弹出达到恢复现场的目的
+  asm(POPG);
+  asm(POPF);
+  asm(POPC);
+  asm(POPB);
+  asm(POPA);
+  asm(RTI);						//将pc弹出返回中断发生处继续工作
+}
+
+void idt_init() {
+  ivec(alltraps);				//将alltraps函数地址设置为中断发生时的跳转地址，换句话说，中断发生时会跳到alltraps进行中断操作
+}
+```
+
+####*	必要细节梳理（memlayout.h）
+
+```
+/* *
+ * Virtual memory map:                                          Permissions
+ *                                                              kernel/user
+ *
+ *     4G ------------------> +---------------------------------+
+ *                            |                                 |
+ *                            |         Empty Memory (*)        |
+ *                            |                                 |
+ *                            +---------------------------------+ 0xFB000000
+ *                            |   Cur. Page Table (Kern, RW)    | RW/-- PTSIZE
+ *     VPT -----------------> +---------------------------------+ 0xFAC00000
+ *                            |        Invalid Memory (*)       | --/--
+ *     KERNTOP -------------> +---------------------------------+ 0xF8000000
+ *                            |                                 |
+ *                            |    Remapped Physical Memory     | RW/-- KMEMSIZE
+ *                            |                                 |
+ *     KERNBASE ------------> +---------------------------------+ 0xC0000000
+ *                            |                                 |
+ *                            |                                 |
+ *                            |                                 |
+ *                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * (*) Note: The kernel ensures that "Invalid Memory" is *never* mapped.
+ *     "Empty Memory" is normally unmapped, but user programs may map pages
+ *     there if desired.
+ *
+ * */
+/* All physical memory mapped at this address */
+#define KERNBASE            0xC0000000
+#define KMEMSIZE            0x38000000                  // the maximum amount of physical memory
+#define KERNTOP             (KERNBASE + KMEMSIZE)
+/* *
+ * Virtual page table. Entry PDX[VPT] in the PD (Page Directory) contains
+ * a pointer to the page directory itself, thereby turning the PD into a page
+ * table, which maps all the PTEs (Page Table Entry) containing the page mappings
+ * for the entire virtual address space into that 4 Meg region starting at VPT.
+ * */
+#define VPT                 0xFAC00000
+#define KSTACKPAGE          2                           // # of pages in kernel stack
+#define KSTACKSIZE          (KSTACKPAGE * PGSIZE)       // sizeof kernel stack
+```
+
+*	这部分是内存空间的排布，32位能够分配4G的空间，其中内核程序都应放置到0xC0000000以上部分，页表放置在0xFAC00000开始的连续空间内，事实上在页机制未启动时所有的段都是分布在0x00000000上的，且物理地址等于逻辑地址，在pmm_init中要做的就是初始化页表使得操作系统的各段的虚拟地址变为0xC0000000，或者说是0xC0000000指向物理地址0x00000000。
+
+
+####*	必要细节梳理（pmm.h）
+
+```
+void
+page_init(void) {
+  uintptr_t freemem;
+  uint32_t maxpa, begin, end;
+  int i;
+  maxpa = msiz();							//获取物理内存大小
+  if (maxpa > KMEMSIZE) {
+    maxpa = KMEMSIZE;
+  }
+  npage = maxpa / PGSIZE;					//所有的物理内存一共能划分出的页数
+  pages = (struct Page *)ROUNDUP((uint)(endbss) + PGSIZE + 3, PGSIZE);	//只有bss段以外的部分才是可以动态分配的空间，换句话说操作系统数据和代码的段是不算进之后能够使用的空间内的
+  for (i = 0; i < npage; i++) {
+    SetPageReserved(pages + i);				//初始化所有的页的标志位
+  }
+  freemem = ((uintptr_t)pages + sizeof(struct Page) * npage);
+  begin = freemem;
+  end = maxpa;
+  if (begin < end) {						//每个可以分配的页都将建立一个页头结构来管理，即struct Page，从pages之后连续的若干个struct Page将所有能分配的物理页串联起来用以分配算法，这里就是初始化部分
+    begin = ROUNDUP(begin, PGSIZE);
+    end = ROUNDDOWN(end, PGSIZE);
+    if (begin < end)
+      init_memmap(pa2page(begin), (end - begin) / PGSIZE);
+  }
+}
+```
+
+```
+void check_and_return(void) {
+  list_entry_t *head = &free_area.free_list;
+  boot_pgdir = (uint)(boot_pgdir) + KERNBASE;	//在启动页表机制之后，页表的虚拟地址不再是0x00000000向上的部分而是0xC0000000向上的部分，所以加上KERNBASE，即0xC0000000
+  boot_pgdir[0] = 0;							//在完成过渡之后，所有的指令地址都处于0xC0000000向上，此时0x00000000和0xC0000000映射到相同的物理内存已经不需要了
+  load_default_pmm_manager();					//在页机制算法初始化时函数指针也是0x00000000向上的部分，重新植入函数指针将函数指针指向到0xC0000000向上的部分
+  pmm_manager = &default_pmm_manager;
+  pages = (uint)(pages) + KERNBASE;
+  while (1) {									//在页表的管理头里的指针都是0x00000000为基址时的状态，在页机制启动后，其中的指针值并不会随之改变，要遍历一次进行更新
+    head->prev = (uint)(head->prev) + KERNBASE;
+    head->next = (uint)(head->next) + KERNBASE;
+    if (head->next == &free_area.free_list) break;
+    head = list_next(head);
+  }
+  check_boot_pgdir();							//均进行完成后页机制已经启动完成，这里是检测机制，与页机制本身无关
+  print_pgdir();
+}
+
+```
+
+```
+uint getsp() {
+  asm (LEA, 8);							//获取栈顶的函数，由于在调用这个函数本身要多压入一个返回地址，所以汇编获得sp的值之后要加上8（v9压栈64位对齐）才是调用函数的程序段中的栈地址
+}
+
+void
+pmm_init(void) {
+  int *ksp;
+  page_enable = 0;	
+  init_pmm_manager();					//页机制算法的初始化
+  page_init();							//页表头的初始化
+  check_alloc_page();					
+  boot_pgdir = boot_alloc_page();
+  memset(boot_pgdir, 0, PGSIZE);		
+  boot_cr3 = boot_pgdir;				//boot_cr3是一级页表的物理地址
+  check_pgdir();
+  boot_pgdir[PDX(VPT)] = (uint)(boot_pgdir) | PTE_P | PTE_W;
+  boot_map_segment(boot_pgdir, KERNBASE, KMEMSIZE, 0, PTE_W);	//页表的初始化设置将0xC0000000到0xC0000000+KMEMSIZE映射到0x00000000到0x00000000+KMEMSIZE
+  boot_pgdir[0] = boot_pgdir[PDX(KERNBASE)];	//页表启动后部分指令地址和变量地址还在0x00000000上而不是0xC0000000，所以此时需要0xC0000000和0x00000000指向同样的物理地址
+  page_enable = 1;						//页机制启动后的标志
+  pdir(boot_cr3);						//设置一级页表的物理地址
+  spage(1);								//打开页机制
+  ksp = KERNBASE + getsp();				//页机制启动后sp应变为0xC0000000+sp
+  asm (LL, 4);							//a<-*(ksp+4)，即a<-ksp
+  asm (SSP);							//sp<-a，即sp<-0xC0000000+sp
+  *(uint *)(getsp()+8) += KERNBASE;		//sp上的函数kern_init的返回地址+0xC0000000
+  *(uint *)(getsp()+16) += KERNBASE;	//sp上的函数main的返回地址+0xC0000000
+  ksp = (uint)(check_and_return) + KERNBASE;	//此时的指令地址还是处于0x00000000上的部分，此时要强行的将之后的执行部分+0xC0000000并跳转进行执行，之后的部分就是check_and_return
+  asm (LL, 4);
+  asm (JSRA);
+}
+```
+
+####*	ucore实现上的技巧说明
+
+```
+/* Return the offset of 'member' relative to the beginning of a struct type */
+#define offsetof(type, member)                                      \
+  ((size_t)(&((type *)0)->member))
+
+/* *
+ * to_struct - get the struct from a ptr
+ * @ptr:    a struct pointer of member
+ * @type:   the type of the struct this is embedded in
+ * @member: the name of the member within the struct
+ * */
+#define to_struct(ptr, type, member)                               \
+  ((type *)((char *)(ptr) - offsetof(type, member)))
+
+```
+
+*	这是ucore中很常用的定义，offsetof(type, member)可以计算struct中的某一个member在这个struct中的偏移量，to_struct则根据struct中某一个member的地址得到struct的地址，这个巧妙的实现使得很多实现变的很简单。
+
+```
+ppn_t
+page2ppn(struct Page *page) {
+  return page - pages;
+}
+
+uintptr_t
+page2pa(struct Page *page) {
+  return page2ppn(page) << PGSHIFT;
+}
+```
+
+*	物理页的申请获得的都是页头即struct Page，将struct Page换为对应的物理地址则通过上述函数实现，pages是页头的起始位置，指针相减可以得到当前的页头是第几个页的页头，然后偏移12位即可，即第0页对应0x0000，第1页对应0x1000，第2页对应0x2000。
+
+*	页的相关信息科参考<a src="https://objectkuan.gitbooks.io/ucore-docs/content/lab2/lab2_3_3_3_phymem_pagelevel.html">实验参考书</a>相关章节
 
 **Lab3**
 
