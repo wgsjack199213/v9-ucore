@@ -367,6 +367,119 @@ page2pa(struct Page *page) {
 
 **Lab3**
 
+####*	磁盘构建
+
+*	v9底层是没有成熟的磁盘接口的，所以在这里我们在内存中开出了一块空间来构建了一块虚拟磁盘。
+
+```
+static char disk[1 * 1024 * 8 * 512];	//在bss段中开出空间构建一块虚拟磁盘作为交换分区
+
+void
+ide_init(void) {
+  memset(disk, sizeof(disk), 0);		//磁盘初始化即是将bss段中的虚拟磁盘区域清空
+}
+
+size_t
+ide_device_size(unsigned short ideno) {
+  return 1 * 1024 * 8;
+}
+
+int										//从磁盘中读则是直接从虚拟磁盘中将内容拷贝进目标地址dst中
+ide_read_secs(unsigned short ideno, uint32_t secno, void *dst, size_t nsecs) {
+  int ret = 0;
+  int i;
+  secno = secno * SECTSIZE;
+  for (; nsecs > 0; nsecs--, dst += SECTSIZE, secno += SECTSIZE) {
+    for (i = 0; i < SECTSIZE; i++) {
+      *((char *)(dst) + i) = disk[secno + i];
+    }
+  }
+  return ret;
+}
+
+int										//往磁盘中写则是直接从来源地址src中向虚拟磁盘中拷贝内容
+ide_write_secs(unsigned short ideno, uint32_t secno, uint32_t *src, size_t nsecs) {
+  int ret = 0;
+  int i;
+  secno = secno * SECTSIZE;
+  for (; nsecs > 0; nsecs--, src += SECTSIZE, secno += SECTSIZE) {
+    for (i = 0; i < SECTSIZE; i++) {
+      disk[secno + i] = *((char *)(src) + i);
+    }
+  }
+  return ret;
+}
+
+```
+
+####*	页缺失
+
+```
+int
+do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
+  int ret = -E_INVAL;
+  struct vma_struct *vma = find_vma(mm, addr);
+  struct Page * page;
+  pte_t *ptep;
+  uint32_t perm;
+  pgfault_num++;
+  if (vma == NULL || vma->vm_start > addr) {
+    printf("not valid addr %x, and  can not find it in vma\n", addr);
+    return ret;
+  }
+  perm = PTE_U;
+  if (vma->vm_flags & VM_WRITE) {
+    perm |= PTE_W;
+  }
+  addr = ROUNDDOWN(addr, PGSIZE);
+  //由于页机制的最小单位是一页，4KB，所以地址的最后十二位不影响实际寻址，所以我们获得异常地址所在页的起始地址进行修正操作
+  ret = -E_NO_MEM;
+  ptep = NULL;
+  if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
+    printf("get_pte in do_pgfault failed\n");
+    return ret;
+  }		
+  //获取到addr的二级页表
+  if (*ptep == 0) {
+	//不存在二级页表则构建一个出来并抛出异常
+    if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
+      printf("pgdir_alloc_page in do_pgfault failed\n");
+      return ret;
+    }
+  }
+  else {
+    if(swap_init_ok) {
+      page=NULL;		
+      //如果二级页表本身已经存在，则将内存中该物理页中的数据复制到对应的交换分区的磁盘中，并将addr映射到内存相应的物理页上
+      if ((ret = swap_in(mm, addr, &page)) != 0) {
+	printf("swap_in in do_pgfault failed\n");
+	return ret;
+      }
+      spage(1);			
+      //在完成映射后要同步清空TLB，由于v9没有TLB指令，在spage打开或者关闭页机制时处理器会完成一次清空TLB操作，所以TLB的清空通过再次打开页机制开关实现
+      page_insert(mm->pgdir, page, addr, perm);
+      swap_map_swappable(mm, addr, page, 1);
+      page->pra_vaddr = addr;
+      //构建页表中的addr到物理页的映射从而将页缺失的问题解决
+    }
+    else {
+      printf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+      return ret;
+    }
+  }
+  ret = 0;
+  return ret;
+}
+
+int pgfault_handler(struct trapframe *tf) {
+    print_pgfault(tf);
+    if (check_mm_struct != NULL) {
+        return do_pgfault(check_mm_struct, tf->fc, lvadr());
+    }	//在trap中获得缺失地址，通过lvadr获得改地址并跳转到vmm中的响应处理函数解决问题
+    panic("unhandled page fault.\n");
+}
+```
+
 **Lab4-Lab5**
 
 **Lab6**
