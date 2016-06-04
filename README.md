@@ -49,7 +49,7 @@
 
 ## 开发过程和运行流程解析
 
-**Lab1-Lab2**
+###Lab1-Lab2
 
 ####*	启动脚本描述
 
@@ -365,7 +365,7 @@ page2pa(struct Page *page) {
 
 *	页的相关信息科参考<a src="https://objectkuan.gitbooks.io/ucore-docs/content/lab2/lab2_3_3_3_phymem_pagelevel.html">实验参考书</a>相关章节
 
-**Lab3**
+###Lab3
 
 ####*	磁盘构建
 
@@ -480,12 +480,131 @@ int pgfault_handler(struct trapframe *tf) {
 }
 ```
 
-**Lab4-Lab5**
+###Lab4-Lab5
 
-**Lab6**
+Lab4-Lab5分别启动了内核线程和用户进程。进程管理包含进程控制块(pstruct.h)和进程控制(proc.h)及进度调度算法(sched.h)。(1) 进程控制块包括进程的基本信息，用于操作系统管理进程。(2) 进程控制包含了进程的fork, execve, exit等方法，相应的会涉及到一些数据结构和对进程控制块的修改，内存分配、中断等问题。(3)调度算法是进程切换的策略。
 
-**Lab7**
+其中(1)和(3)与硬件基本无关，可以使用X86的ucore的代码。对于(2)中和进程的内存相关的代码，和硬件密切相关。下面列出了重点修改的代码片段。
 
-**Lab8**
+切换内核栈，由于汇编指令的差异，需要修改变换内核栈的代码。
+
+```
+void switch_to(struct context *oldc, struct context *newc) // switch stacks
+{
+  oldc->pc = *(uint*)(getsp());
+  oldc->sp = getsp() + 8;
+  oldc->b = getb();
+  oldc->c = getc();
+
+  setb(newc->b);
+  setc(newc->c);
+  *(uint*)((uint)(newc->sp) - 8) = newc->pc;
+  seta((uint)(newc->sp) - 8);
+  asm (SSP);
+  asm (LEV);
+}
+```
+
+复制进程，在这一部分，造成差异的是寄存器的不同。
+
+```
+// copy_thread - setup the trapframe on the  process's kernel stack top and
+//             - setup the kernel entry point and stack of process
+static void
+copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
+
+  proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
+  memcpy(proc->tf, tf, sizeof(struct trapframe));
+  proc->tf->tf_regs.a = 0;
+  proc->tf->tf_regs.sp = esp;
+  proc->tf->fc = (proc->tf->fc);  // | 16;
+
+  proc->context.pc = (uintptr_t)(forkret);
+  proc->context.sp = (uintptr_t)(proc->tf);
+}
+```
+
+代码加载load_icode，在这一阶段，磁盘驱动尚未启动，需要采用特殊的方法获取代码。X86的ucore采用链接脚本实现，它把用户态程序的二进制拼接在系统内核之后，v9的编译器暂时不支持类似操作。我们使用的解决方法是将编译好的二进制文件当作磁盘映射到物理内存的最后4MB，因为模拟器通过类似的方式支持磁盘镜像。但是存在一个问题，在程序头中，没有存储文件的大小，所以我们编写了ChangeHeader.c小工具，重新构造程序的elfheader，使之包含所需的文件大小的信息。load_icode可以从物理内存的后4MB读取elfheader，然后根据提示的信息，把程序拷贝到新进程的内存中。
+
+```
+binary是二进制的虚地址指针，bsize是无效的参数
+load_icode(unsigned char *binary, size_t bsize) 
+
+  检查程序头
+  if (hdr->magic != ELF_MAGIC) {
+    ret = -E_INVAL_ELF;
+    goto bad_elf_cleanup_pgdir;
+  }
+
+  为进程构建PDT	
+  if (current->mm != NULL) {
+    panic("load_icode: current->mm must be empty.\n");
+  }
+  if ((mm = mm_create()) == NULL) {
+    goto bad_mm;
+  }
+  if (setup_pgdir(mm) != 0) {
+    goto bad_pgdir_cleanup_mm;
+  }
+
+  vm_flags = 0, perm = PTE_U;
+  vm_flags = VM_EXEC | VM_WRITE | VM_READ;
+  if (vm_flags & VM_WRITE) perm |= PTE_W;
+
+  if ((ret = mm_map(mm, USERBASE,  hdr->size + hdr->bss, vm_flags, NULL)) != 0) {
+    goto bad_cleanup_mmap;
+  }
+  
+  拷贝TEXT、DATA段
+  from = (uint)(binary)+sizeof(struct elfhdr);
+  start = USERBASE;
+  la = ROUNDDOWN(start, PGSIZE);
+  ret = -E_NO_MEM;
+  end = USERBASE + hdr->size;
+  while (start < end) {
+    if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
+      goto bad_cleanup_mmap;
+    }
+    off = start - la, size = PGSIZE - off, la += PGSIZE;
+    if (end < la) {
+      size -= la - end;
+    }
+    memcpy(page2kva(page) + off, from, size);
+    start += size, from += size;
+  }
+
+  构建BSS段
+  end = USERBASE + hdr->size + hdr->bss;
+  if (start < la) {
+    /* ph->p_memsz == ph->p_filesz */
+    if (start == end) {
+      continue;
+    }
+    off = start + PGSIZE - la, size = PGSIZE - off;
+    if (end < la) {
+      size -= la - end;
+    }
+    memset(page2kva(page) + off, 0, size);
+    start += size;
+    assert((end < la && start == end) || (end >= la && start == la));
+  }
+  while (start < end) {
+    if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
+      goto bad_cleanup_mmap;
+    }
+    off = start - la, size = PGSIZE - off, la += PGSIZE;
+    if (end < la) {
+      size -= la - end;
+    }
+    memset(page2kva(page) + off, 0, size);
+    start += size;
+  }
+```
+
+###Lab6
+
+###Lab7
+
+###Lab8
 
 ## 实验总结
