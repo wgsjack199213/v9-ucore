@@ -491,8 +491,8 @@ Lab4-Lab5分别启动了内核线程和用户进程。进程管理包含进程�
 ```
 void switch_to(struct context *oldc, struct context *newc) // switch stacks
 {
-  oldc->pc = *(uint*)(getsp());
-  oldc->sp = getsp() + 8;
+  oldc->pc = *(uint*)(getsp());				//下次切换进程返回的PC应该是调用switch_to指令地址
+  oldc->sp = getsp() + 8;					
   oldc->b = getb();
   oldc->c = getc();
 
@@ -517,10 +517,9 @@ copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
   memcpy(proc->tf, tf, sizeof(struct trapframe));
   proc->tf->tf_regs.a = 0;
   proc->tf->tf_regs.sp = esp;
-  proc->tf->fc = (proc->tf->fc);  // | 16;
-
-  proc->context.pc = (uintptr_t)(forkret);
-  proc->context.sp = (uintptr_t)(proc->tf);
+  proc->tf->fc = (proc->tf->fc);
+  proc->context.pc = (uintptr_t)(forkret);		//进程在调度之后直接forkret返回
+  proc->context.sp = (uintptr_t)(proc->tf);	//forkret和中断处理返回是一致的，所以栈顶需要一个trapframe
 }
 ```
 
@@ -603,6 +602,8 @@ load_icode(unsigned char *binary, size_t bsize)
 
 ###Lab6-Lab7
 
+此部分与底层关联不大，具体的细节可以参考
+<a href="https://objectkuan.gitbooks.io/ucore-docs/content/lab6.html">x86-ucore</a>的实验参考相关章节
 
 ###Lab8
 Lab8加入了文件系统，由于ucore中的磁盘是从linux借鉴过来，具有复杂的层次结构，考虑到时间上的原因，我们没有修改这个复杂的结构，而是采用了xv6中的解决方案，在系统调用层面进行统一。相应的，还需要对load_icode进行有限的修改。
