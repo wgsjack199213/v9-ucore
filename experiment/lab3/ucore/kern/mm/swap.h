@@ -9,7 +9,7 @@
 #include <defs.h>
 #include <call.h>
 #include <vmm.h>
-#include <swap_fifo.h>
+#include <swap_enhclock.h>
 #include <swapfs.h>
 
 /* *
@@ -65,14 +65,14 @@ struct swap_manager *sm;
 struct swap_manager swap_manager_fifo;
 
 void load_swap_manager() {
-  swap_manager_fifo.name            = "fifo swap manager";
-  swap_manager_fifo.init            = _fifo_init;
-  swap_manager_fifo.init_mm         = _fifo_init_mm;
-  swap_manager_fifo.tick_event      = _fifo_tick_event;
-  swap_manager_fifo.map_swappable   = _fifo_map_swappable;
-  swap_manager_fifo.set_unswappable = _fifo_set_unswappable;
-  swap_manager_fifo.swap_out_victim = _fifo_swap_out_victim;
-  swap_manager_fifo.check_swap      = _fifo_check_swap;
+  swap_manager_fifo.name            = "enhanced clock swap manager";
+  swap_manager_fifo.init            = _enhclock_init;
+  swap_manager_fifo.init_mm         = _enhclock_init_mm;
+  swap_manager_fifo.tick_event      = _enhclock_tick_event;
+  swap_manager_fifo.map_swappable   = _enhclock_map_swappable;
+  swap_manager_fifo.set_unswappable = _enhclock_set_unswappable;
+  swap_manager_fifo.swap_out_victim = _enhclock_swap_out_victim;
+  swap_manager_fifo.check_swap      = _enhclock_check_swap;
 }
 
 
