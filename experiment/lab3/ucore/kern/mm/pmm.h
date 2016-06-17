@@ -200,6 +200,7 @@ struct mm_struct {
   pde_t *pgdir;                     // the PDT of these vma
   int map_count;                    // the count of these vma
   void *sm_priv;                    // the private data for swap manager
+  void *clock_hand;                 // used in the enhanced clock page replacement algorithm
 };
 
 int swap_init_ok = 0;

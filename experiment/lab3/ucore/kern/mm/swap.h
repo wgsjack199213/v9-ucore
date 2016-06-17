@@ -147,7 +147,9 @@ swap_out(struct mm_struct *mm, int n, int in_tick)
 
     v = page->pra_vaddr;
     ptep = get_pte(mm->pgdir, v, 0);
+    //printf("I'm here-------------------\n",i);
     assert((*ptep & PTE_P) != 0);
+    //printf("I'm here2-------------------\n",i);
     if (swapfs_write( (page->pra_vaddr/PGSIZE+1)<<8, page) != 0) {
       printf("SWAP: failed to save\n");
       call4(mm, v, page, 0, sm->map_swappable);
