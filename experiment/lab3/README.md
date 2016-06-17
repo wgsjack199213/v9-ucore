@@ -49,6 +49,7 @@
 	fatal compiler error rv(int *a) *a=0
 	
 **样例程序2**（while中声明变量）：
+
 	int main()
 	{
 	    int x = 1;
